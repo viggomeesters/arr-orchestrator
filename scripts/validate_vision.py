@@ -28,7 +28,7 @@ def check(obj, spec, path='$'):
     if 'enum' in spec and obj not in spec['enum']: errors.append(f'{path}: invalid value')
 check(contract,schema)
 ids=[p.get('id') for p in contract.get('principles',[])]
-for required in ('agent-first','plan-before-apply','fail-closed','external-runtime-state','api-over-ui','public-safe'):
+for required in ('agent-first','plan-before-apply','fail-closed','external-runtime-state','api-over-ui','json-first','public-safe'):
     if required not in ids: errors.append(f'missing principle: {required}')
 if len(ids)!=len(set(ids)): errors.append('duplicate principle ids')
 if len(contract.get('acceptance_scorecard',[]))<6: errors.append('acceptance scorecard needs at least six checks')

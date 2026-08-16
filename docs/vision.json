@@ -128,6 +128,24 @@
       ]
     },
     {
+      "id": "json-first",
+      "title": "JSON-first contracts",
+      "rule": "Keep machine-consumable product state, plans, evidence, and capability contracts in versioned JSON or JSONL; Markdown explains but does not replace them.",
+      "good": [
+        "versioned JSON Schemas",
+        "stable JSON output",
+        "append-only JSONL evidence"
+      ],
+      "bad": [
+        "canonical state hidden in prose",
+        "unstructured command output"
+      ],
+      "enforcement": [
+        "schema validation",
+        "contract tests"
+      ]
+    },
+    {
       "id": "public-safe",
       "title": "Public-safe by construction",
       "rule": "All tracked fixtures, examples, screenshots, and logs must be synthetic and free from deployment-identifying data.",

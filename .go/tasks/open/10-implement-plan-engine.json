@@ -1,0 +1,46 @@
+{
+  "schema": "go-workflow.repo-local.task.v1",
+  "kind": "task",
+  "execution_mode": "agent",
+  "shareable_delivery": "none",
+  "id": "10-implement-plan-engine",
+  "project": "arr-orchestrator",
+  "status": "open",
+  "summary": "Generate deterministic mutation plans from desired and observed state",
+  "description": "Compare desired state with normalized inventory and produce exact, ordered, hashed operations with policy verdicts and blockers.",
+  "scope": {
+    "read": [
+      "schemas/**",
+      "src/**",
+      "tests/fixtures/**",
+      "examples/**"
+    ],
+    "modify": [
+      "src/arr_orchestrator/planning/**",
+      "tests/planning/**",
+      "docs/planning.md"
+    ]
+  },
+  "acceptance": [
+    "Equivalent inputs produce byte-stable canonical plan identity.",
+    "Plans name exact service, endpoint class, target, before value, after value, and verification step.",
+    "Destructive, unsupported, or ambiguous operations are blocked rather than emitted."
+  ],
+  "verification": [
+    "python3 -m unittest discover -s tests/planning -p \"test_*.py\"",
+    "bash scripts/check.sh"
+  ],
+  "claim": {
+    "agent": null,
+    "claimed_at": null
+  },
+  "work_status": "pending",
+  "review_status": "none",
+  "review_history": [],
+  "evidence": [],
+  "depends_on": [
+    "09-implement-doctor-rules"
+  ],
+  "priority": 10,
+  "delivery": "product_implementation_backlog"
+}

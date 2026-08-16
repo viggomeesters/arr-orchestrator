@@ -1,0 +1,46 @@
+{
+  "schema": "go-workflow.repo-local.task.v1",
+  "kind": "task",
+  "execution_mode": "agent",
+  "shareable_delivery": "none",
+  "id": "03-implement-sonarr-readonly-adapter",
+  "project": "arr-orchestrator",
+  "status": "open",
+  "summary": "Implement the read-only Sonarr adapter",
+  "description": "Add API version discovery and normalized read-only access to system status, root folders, download clients, quality profiles, and queue summaries using synthetic responses.",
+  "scope": {
+    "read": [
+      "schemas/**",
+      "src/**",
+      "docs/**"
+    ],
+    "modify": [
+      "src/arr_orchestrator/adapters/sonarr.py",
+      "tests/adapters/test_sonarr.py",
+      "tests/fixtures/sonarr/**",
+      "docs/adapters/sonarr.md"
+    ]
+  },
+  "acceptance": [
+    "Unsupported API versions fail with a typed blocker.",
+    "Secrets and request headers are redacted from all output.",
+    "Synthetic fixtures prove normalized capability and configuration output."
+  ],
+  "verification": [
+    "python3 -m unittest tests.adapters.test_sonarr",
+    "bash scripts/check.sh"
+  ],
+  "claim": {
+    "agent": null,
+    "claimed_at": null
+  },
+  "work_status": "pending",
+  "review_status": "none",
+  "review_history": [],
+  "evidence": [],
+  "depends_on": [
+    "02-build-arrctl-skeleton"
+  ],
+  "priority": 3,
+  "delivery": "product_implementation_backlog"
+}

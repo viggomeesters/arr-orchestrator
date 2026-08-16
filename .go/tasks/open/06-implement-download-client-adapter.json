@@ -1,0 +1,46 @@
+{
+  "schema": "go-workflow.repo-local.task.v1",
+  "kind": "task",
+  "execution_mode": "agent",
+  "shareable_delivery": "none",
+  "id": "06-implement-download-client-adapter",
+  "project": "arr-orchestrator",
+  "status": "open",
+  "summary": "Implement a read-only qBittorrent adapter",
+  "description": "Add capability, category, save-path, and queue-state discovery needed for path and import diagnosis.",
+  "scope": {
+    "read": [
+      "schemas/**",
+      "src/**",
+      "docs/**"
+    ],
+    "modify": [
+      "src/arr_orchestrator/adapters/qbittorrent.py",
+      "tests/adapters/test_qbittorrent.py",
+      "tests/fixtures/qbittorrent/**",
+      "docs/adapters/qbittorrent.md"
+    ]
+  },
+  "acceptance": [
+    "Authentication and version discovery are explicit.",
+    "Queue output is normalized and redacted.",
+    "Category and path data integrate with doctor rules without exposing download names."
+  ],
+  "verification": [
+    "python3 -m unittest tests.adapters.test_qbittorrent",
+    "bash scripts/check.sh"
+  ],
+  "claim": {
+    "agent": null,
+    "claimed_at": null
+  },
+  "work_status": "pending",
+  "review_status": "none",
+  "review_history": [],
+  "evidence": [],
+  "depends_on": [
+    "02-build-arrctl-skeleton"
+  ],
+  "priority": 6,
+  "delivery": "product_implementation_backlog"
+}

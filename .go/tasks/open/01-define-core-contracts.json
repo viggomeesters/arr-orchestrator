@@ -1,0 +1,43 @@
+{
+  "schema": "go-workflow.repo-local.task.v1",
+  "kind": "task",
+  "execution_mode": "agent",
+  "shareable_delivery": "none",
+  "id": "01-define-core-contracts",
+  "project": "arr-orchestrator",
+  "status": "open",
+  "summary": "Define versioned core schemas and error taxonomy",
+  "description": "Define desired state, capabilities, normalized inventory, diagnosis findings, plans, evidence, and typed blocker contracts before CLI or adapter implementation.",
+  "scope": {
+    "read": [
+      "docs/**",
+      ".go/**",
+      "examples/**"
+    ],
+    "modify": [
+      "schemas/**",
+      "docs/contracts.md",
+      "tests/contracts/**"
+    ]
+  },
+  "acceptance": [
+    "Versioned JSON Schemas cover desired state, capabilities, inventory, findings, plan, evidence, and errors.",
+    "Schemas reject private runtime fields and ambiguous mutation targets.",
+    "Synthetic positive and negative fixtures validate without network access."
+  ],
+  "verification": [
+    "python3 -m unittest discover -s tests/contracts -p \"test_*.py\"",
+    "bash scripts/check.sh"
+  ],
+  "claim": {
+    "agent": null,
+    "claimed_at": null
+  },
+  "work_status": "pending",
+  "review_status": "none",
+  "review_history": [],
+  "evidence": [],
+  "depends_on": [],
+  "priority": 1,
+  "delivery": "product_implementation_backlog"
+}

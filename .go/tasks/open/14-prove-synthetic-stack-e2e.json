@@ -1,0 +1,46 @@
+{
+  "schema": "go-workflow.repo-local.task.v1",
+  "kind": "task",
+  "execution_mode": "agent",
+  "shareable_delivery": "none",
+  "id": "14-prove-synthetic-stack-e2e",
+  "project": "arr-orchestrator",
+  "status": "open",
+  "summary": "Prove doctor to verify against a synthetic media stack",
+  "description": "Run the complete operation lifecycle against isolated synthetic service doubles and publish redacted machine-readable evidence fixtures.",
+  "scope": {
+    "read": [
+      "src/**",
+      "schemas/**",
+      "tests/**",
+      "docs/**"
+    ],
+    "modify": [
+      "tests/e2e/**",
+      "tests/fixtures/e2e/**",
+      "docs/e2e-proof.md"
+    ]
+  },
+  "acceptance": [
+    "A synthetic misconfiguration is diagnosed, planned, applied, and verified end to end.",
+    "A stale-plan scenario and an unauthorized destructive scenario fail closed.",
+    "Proof artifacts contain no secrets, network identifiers, media titles, or runtime paths."
+  ],
+  "verification": [
+    "python3 -m unittest discover -s tests/e2e -p \"test_*.py\"",
+    "bash scripts/check.sh"
+  ],
+  "claim": {
+    "agent": null,
+    "claimed_at": null
+  },
+  "work_status": "pending",
+  "review_status": "none",
+  "review_history": [],
+  "evidence": [],
+  "depends_on": [
+    "13-implement-hermes-command-contract"
+  ],
+  "priority": 14,
+  "delivery": "product_implementation_backlog"
+}

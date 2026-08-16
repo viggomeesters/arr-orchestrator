@@ -1,0 +1,286 @@
+{
+  "$schema": "../schemas/repo-vision-contract.schema.json",
+  "schema_version": "1.0.0",
+  "artifact_kind": "repo_design_vision_contract",
+  "repo": {
+    "name": "arr-orchestrator",
+    "primary_users": [
+      "self-hosting operators",
+      "automation agents",
+      "contributors"
+    ],
+    "product_surface": "agent_first_control_plane"
+  },
+  "vision": {
+    "one_line": "An agent-operated control plane for safe, reproducible, and verified self-hosted media automation.",
+    "north_star": "A user can state an outcome in Telegram and trust the agent to diagnose, plan, execute, and verify the complete result across the media stack.",
+    "target_users": [
+      "Self-hosters tired of coordinating several media automation applications by hand",
+      "Agent builders who need deterministic and safe service-operation contracts"
+    ],
+    "promise": "Point a capable agent at the repository, describe the desired outcome, and receive a verified result or a precise blocker without manual cross-application work.",
+    "wedge": "Start with read-only inventory and cross-service diagnosis, then add deterministic plan/apply/verify operations over existing service APIs rather than building another dashboard.",
+    "assumptions": [
+      "The underlying media applications remain the authoritative domain services.",
+      "Most operational friction comes from cross-service configuration, paths, permissions, and evidence rather than missing domain features.",
+      "Operators can provide scoped API or SSH access outside Git.",
+      "A deterministic CLI is a safer agent interface than browser automation."
+    ],
+    "success_criteria": [
+      "A fresh clone passes local gates without access to a private deployment.",
+      "Every remote mutation is derived from a stable plan and followed by readback verification.",
+      "Doctor output explains cross-service failures with evidence and actionable ownership.",
+      "No private deployment state or credentials enter repository history.",
+      "Telegram users receive concise outcomes rather than command choreography.",
+      "Synthetic end-to-end fixtures prove doctor, plan, apply, and verify behavior before live use."
+    ]
+  },
+  "principles": [
+    {
+      "id": "agent-first",
+      "title": "Agent-first product surface",
+      "rule": "Design stable machine-readable commands, schemas, evidence, and failure states before human dashboards.",
+      "good": [
+        "JSON output",
+        "deterministic exit codes",
+        "explicit operation schemas"
+      ],
+      "bad": [
+        "UI-only capability",
+        "prose-only state"
+      ],
+      "enforcement": [
+        "contract tests",
+        "CLI smoke tests"
+      ]
+    },
+    {
+      "id": "plan-before-apply",
+      "title": "Plan before apply",
+      "rule": "Every remote mutation must be represented by a reviewable, hashed plan whose scope cannot expand during execution.",
+      "good": [
+        "stable plan identity",
+        "exact target list",
+        "stale-plan rejection"
+      ],
+      "bad": [
+        "ad hoc remote writes",
+        "silent scope expansion"
+      ],
+      "enforcement": [
+        "plan schema",
+        "apply policy tests",
+        "readback"
+      ]
+    },
+    {
+      "id": "fail-closed",
+      "title": "Reliable fail-closed behavior",
+      "rule": "Missing credentials, capabilities, path identity, authority, or verification evidence must produce a visible blocker.",
+      "good": [
+        "typed blockers",
+        "unsupported-version errors",
+        "partial-result labeling"
+      ],
+      "bad": [
+        "guessed state",
+        "best-effort success claims"
+      ],
+      "enforcement": [
+        "negative fixtures",
+        "error taxonomy tests"
+      ]
+    },
+    {
+      "id": "external-runtime-state",
+      "title": "External runtime state",
+      "rule": "Credentials, inventories, plans, logs, evidence, databases, and caches live outside the repository checkout.",
+      "good": [
+        "XDG config and data paths",
+        "secret references",
+        "redacted evidence"
+      ],
+      "bad": [
+        "checked-in live responses",
+        "repo-local databases"
+      ],
+      "enforcement": [
+        "gitignore guards",
+        "public-safety scanner"
+      ]
+    },
+    {
+      "id": "api-over-ui",
+      "title": "APIs over browser automation",
+      "rule": "Use official service APIs and controlled SSH operations before browser automation or direct internal-database changes.",
+      "good": [
+        "version discovery",
+        "adapter boundaries",
+        "capability checks"
+      ],
+      "bad": [
+        "fragile DOM automation",
+        "database mutation"
+      ],
+      "enforcement": [
+        "adapter contracts",
+        "architecture review"
+      ]
+    },
+    {
+      "id": "public-safe",
+      "title": "Public-safe by construction",
+      "rule": "All tracked fixtures, examples, screenshots, and logs must be synthetic and free from deployment-identifying data.",
+      "good": [
+        "invalid example domains",
+        "synthetic stack ids",
+        "redacted output"
+      ],
+      "bad": [
+        "real media titles",
+        "hostnames",
+        "API keys"
+      ],
+      "enforcement": [
+        "safety scan",
+        "history review"
+      ]
+    },
+    {
+      "id": "evidence-is-product",
+      "title": "Evidence is part of the product",
+      "rule": "Completion means the requested outcome is observed, not merely that commands returned successful status codes.",
+      "good": [
+        "cross-service readback",
+        "end-to-end assertions",
+        "residual-gap reporting"
+      ],
+      "bad": [
+        "HTTP 200 as completion",
+        "unverified apply"
+      ],
+      "enforcement": [
+        "verification contracts",
+        "evidence fixtures"
+      ]
+    },
+    {
+      "id": "compact-not-shallow",
+      "title": "Compact, not shallow",
+      "rule": "Telegram responses remain concise while repository artifacts retain enough structured evidence for audit and repair.",
+      "good": [
+        "short user summary",
+        "linked evidence id",
+        "typed blocker"
+      ],
+      "bad": [
+        "raw logs in chat",
+        "vague success prose"
+      ],
+      "enforcement": [
+        "output contract tests",
+        "redaction tests"
+      ]
+    }
+  ],
+  "non_goals": [
+    "Reimplement the media applications or their domain logic.",
+    "Ship a generic all-in-one dashboard before control-plane reliability is proven.",
+    "Support destructive cleanup without explicit authority and dedicated safety contracts.",
+    "Store or synchronize a user's private media inventory in the public repository."
+  ],
+  "public_safety": {
+    "forbidden": [
+      "secrets and credentials",
+      "real hostnames and IP addresses",
+      "media library and request history",
+      "private screenshots and API responses",
+      "generated runtime databases, plans, logs, and caches",
+      "proprietary copied configuration"
+    ],
+    "required_boundaries": [
+      "synthetic fixtures only",
+      "runtime state outside Git",
+      "secret references instead of values",
+      "redaction before persistence or Telegram output",
+      "history review before publication"
+    ],
+    "remote_action_gates": [
+      "read-only discovery is the default",
+      "mutation requires a stable plan",
+      "deletion requires explicit human authority",
+      "apply requires post-action readback",
+      "unsupported capabilities block execution"
+    ]
+  },
+  "acceptance_scorecard": [
+    {
+      "id": "clone-ready",
+      "question": "Can a new developer or agent start from a fresh clone?",
+      "pass_condition": "The documented clone and bash scripts/check.sh path succeeds without private infrastructure."
+    },
+    {
+      "id": "agent-readable",
+      "question": "Can an agent understand product state without scraping conversation history?",
+      "pass_condition": "Product vision, principles, hierarchy, tasks, decisions, and evidence are present in valid .go JSON or JSONL."
+    },
+    {
+      "id": "safe-public",
+      "question": "Is the repository safe to publish and fork?",
+      "pass_condition": "Current files and Git history contain no secrets, private deployment data, generated runtime state, or private media metadata."
+    },
+    {
+      "id": "plan-safe",
+      "question": "Are remote mutations structurally bounded?",
+      "pass_condition": "The design requires stable plan identity, target allowlists, stale-plan rejection, and explicit destructive-action gates."
+    },
+    {
+      "id": "evidence-backed",
+      "question": "Does completion represent an observed outcome?",
+      "pass_condition": "Verification contracts require service readback and end-to-end evidence rather than command status alone."
+    },
+    {
+      "id": "backlog-executable",
+      "question": "Can implementation continue in dependency order?",
+      "pass_condition": "Every product slice is an individually claimable .go task with scope, acceptance, and verification commands."
+    },
+    {
+      "id": "visual-professional",
+      "question": "Does the public landing surface explain the product clearly?",
+      "pass_condition": "The README renders a visually checked hero with legible title, flow, boundaries, and no clipping or placeholders."
+    }
+  ],
+  "review_checklist": [
+    "Read the claimed .go task before editing.",
+    "Keep changes inside task scope.",
+    "Use synthetic fixtures only.",
+    "Separate discovery, plan, apply, and verify.",
+    "Run bash scripts/check.sh.",
+    "Run a critic or adversarial review before finish.",
+    "Record residual risk and evidence.",
+    "Confirm Git contains no runtime artifacts or secrets."
+  ],
+  "maturity_model": [
+    {
+      "level": "L0",
+      "state": "foundation_valid",
+      "meaning": "Repository contracts, documentation, local gates, and public safety are complete."
+    },
+    {
+      "level": "L1",
+      "state": "readonly_proven",
+      "meaning": "Synthetic adapters, normalized inventory, and doctor rules are tested without mutation."
+    },
+    {
+      "level": "L2",
+      "state": "safe_mutation_proven",
+      "meaning": "Plan, apply, rollback support, and verification pass synthetic end-to-end tests."
+    },
+    {
+      "level": "L3",
+      "state": "live_pilot_proven",
+      "meaning": "A private deployment pilot completes bounded operations with redacted evidence and operator review."
+    }
+  ],
+  "residual_risk_wording": "The foundation is production-minded, but no live service adapter or remote mutation exists at v0.1.0; deployment trust requires completion of the ordered Go backlog and a private pilot."
+}

@@ -1,0 +1,51 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+credentials/
+
+# Private deployment and runtime state
+.local/
+runtime/
+state/
+inventory/
+plans/generated/
+reports/generated/
+*.sqlite
+*.sqlite3
+*.db
+*.log
+*.pid
+*.sock
+
+# Media and download data
+media/
+downloads/
+*.torrent
+*.nzb
+
+# Python and tooling caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Rendered local QA output
+artifacts/qa/

@@ -1,0 +1,46 @@
+{
+  "schema": "go-workflow.repo-local.task.v1",
+  "kind": "task",
+  "execution_mode": "agent",
+  "shareable_delivery": "none",
+  "id": "11-implement-bounded-apply",
+  "project": "arr-orchestrator",
+  "status": "open",
+  "summary": "Apply allowlisted plans with stale-plan and rollback guards",
+  "description": "Execute only supported plan operations, reject drifted plans, create backups where available, and read back every mutation.",
+  "scope": {
+    "read": [
+      "schemas/**",
+      "src/**",
+      "tests/fixtures/**",
+      "docs/security-model.md"
+    ],
+    "modify": [
+      "src/arr_orchestrator/apply/**",
+      "tests/apply/**",
+      "docs/apply.md"
+    ]
+  },
+  "acceptance": [
+    "Apply refuses plans whose observed-state fingerprint has changed.",
+    "Only allowlisted non-destructive operations are available in the first mutation release.",
+    "Each operation records redacted request attribution, result, readback, and rollback capability."
+  ],
+  "verification": [
+    "python3 -m unittest discover -s tests/apply -p \"test_*.py\"",
+    "bash scripts/check.sh"
+  ],
+  "claim": {
+    "agent": null,
+    "claimed_at": null
+  },
+  "work_status": "pending",
+  "review_status": "none",
+  "review_history": [],
+  "evidence": [],
+  "depends_on": [
+    "10-implement-plan-engine"
+  ],
+  "priority": 11,
+  "delivery": "product_implementation_backlog"
+}

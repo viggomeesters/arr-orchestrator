@@ -1,0 +1,31 @@
+{
+  "schema": "go-workflow.repo-local.project.v1",
+  "kind": "project",
+  "id": "arr-orchestrator",
+  "name": "Arr Orchestrator",
+  "source_of_truth": "repo-local",
+  "contract_version": 2,
+  "project_mode": "project",
+  "required_stack_version": "0.3.11",
+  "stack_ref": "v0.3.11",
+  "default_verification": [
+    "bash scripts/check.sh"
+  ],
+  "links": {
+    "repo": "https://github.com/viggomeesters/arr-orchestrator"
+  },
+  "repository_profile": "public-professional",
+  "default_branch": "main",
+  "quality_gates": [
+    "bash scripts/check.sh",
+    "python3 scripts/validate_vision.py",
+    "python3 scripts/check_public_safety.py",
+    "python3 scripts/check_hero.py",
+    "git diff --check"
+  ],
+  "runtime_state_policy": {
+    "location": "outside_git",
+    "config": "${XDG_CONFIG_HOME:-~/.config}/arr-orchestrator",
+    "data": "${XDG_DATA_HOME:-~/.local/share}/arr-orchestrator"
+  }
+}

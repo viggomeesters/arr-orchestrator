@@ -1,0 +1,46 @@
+{
+  "schema": "go-workflow.repo-local.task.v1",
+  "kind": "task",
+  "execution_mode": "agent",
+  "shareable_delivery": "none",
+  "id": "07-implement-media-server-adapter",
+  "project": "arr-orchestrator",
+  "status": "open",
+  "summary": "Implement a read-only Jellyfin adapter",
+  "description": "Add health, library-path, and refresh-status discovery needed to verify user-visible media availability.",
+  "scope": {
+    "read": [
+      "schemas/**",
+      "src/**",
+      "docs/**"
+    ],
+    "modify": [
+      "src/arr_orchestrator/adapters/jellyfin.py",
+      "tests/adapters/test_jellyfin.py",
+      "tests/fixtures/jellyfin/**",
+      "docs/adapters/jellyfin.md"
+    ]
+  },
+  "acceptance": [
+    "Adapter reports health and library visibility without persisting media titles.",
+    "Unsupported capabilities remain explicit.",
+    "Synthetic fixtures prove healthy, unreachable, and partial states."
+  ],
+  "verification": [
+    "python3 -m unittest tests.adapters.test_jellyfin",
+    "bash scripts/check.sh"
+  ],
+  "claim": {
+    "agent": null,
+    "claimed_at": null
+  },
+  "work_status": "pending",
+  "review_status": "none",
+  "review_history": [],
+  "evidence": [],
+  "depends_on": [
+    "02-build-arrctl-skeleton"
+  ],
+  "priority": 7,
+  "delivery": "product_implementation_backlog"
+}

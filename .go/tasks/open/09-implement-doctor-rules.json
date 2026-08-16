@@ -1,0 +1,46 @@
+{
+  "schema": "go-workflow.repo-local.task.v1",
+  "kind": "task",
+  "execution_mode": "agent",
+  "shareable_delivery": "none",
+  "id": "09-implement-doctor-rules",
+  "project": "arr-orchestrator",
+  "status": "open",
+  "summary": "Implement cross-service doctor rules",
+  "description": "Diagnose connectivity, application wiring, categories, root folders, remote path mappings, quality profiles, and hardlink feasibility from normalized inventory.",
+  "scope": {
+    "read": [
+      "schemas/**",
+      "src/**",
+      "tests/fixtures/**",
+      "docs/architecture.md"
+    ],
+    "modify": [
+      "src/arr_orchestrator/doctor/**",
+      "tests/doctor/**",
+      "docs/doctor.md"
+    ]
+  },
+  "acceptance": [
+    "Every finding has severity, owner, evidence references, explanation, and remediation guidance.",
+    "Ambiguous path identity and unavailable filesystem evidence fail closed.",
+    "Synthetic scenarios cover healthy, partial, miswired, and hardlink-impossible stacks."
+  ],
+  "verification": [
+    "python3 -m unittest discover -s tests/doctor -p \"test_*.py\"",
+    "bash scripts/check.sh"
+  ],
+  "claim": {
+    "agent": null,
+    "claimed_at": null
+  },
+  "work_status": "pending",
+  "review_status": "none",
+  "review_history": [],
+  "evidence": [],
+  "depends_on": [
+    "08-implement-stack-inventory"
+  ],
+  "priority": 9,
+  "delivery": "product_implementation_backlog"
+}

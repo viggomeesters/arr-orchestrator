@@ -1,0 +1,25 @@
+{
+  "schema": "go-workflow.repo-local.vision.v1",
+  "kind": "vision",
+  "project": "arr-orchestrator",
+  "status": "active",
+  "north_star": "A Telegram instruction is enough for a trusted agent to safely diagnose, configure, repair, and verify a self-hosted *arr media stack.",
+  "wedge": "An agent-first operational contract and control plane over existing *arr APIs, not another dashboard or a replacement for Sonarr and Radarr.",
+  "target_user": "Self-hosters who want an agent to operate their media automation stack without manual cross-application configuration.",
+  "core_promise": "Point an agent at this repository, describe the desired outcome, and receive a verified result or an explicit blocker.",
+  "product_principles": [
+    "Telegram is the human interface; deterministic CLI and APIs are the agent interface.",
+    "Plan before apply, verify after mutation, and fail closed when evidence is missing.",
+    "Keep private deployment state, credentials, media metadata, and runtime artifacts outside Git."
+  ],
+  "non_goals": [
+    "Reimplement Sonarr, Radarr, Prowlarr, download clients, or media servers.",
+    "Ship a generic dashboard before the operational control plane is proven.",
+    "Commit real household configuration, API keys, media libraries, download history, or host inventories."
+  ],
+  "success_metrics": [
+    "A fresh clone explains the product and passes all local gates without private infrastructure.",
+    "An agent can discover the next task and its acceptance criteria entirely from repo-local .go state.",
+    "Future adapters can prove doctor, plan, apply, rollback, and verify behavior against synthetic fixtures."
+  ]
+}

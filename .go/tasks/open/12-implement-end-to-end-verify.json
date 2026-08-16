@@ -1,0 +1,45 @@
+{
+  "schema": "go-workflow.repo-local.task.v1",
+  "kind": "task",
+  "execution_mode": "agent",
+  "shareable_delivery": "none",
+  "id": "12-implement-end-to-end-verify",
+  "project": "arr-orchestrator",
+  "status": "open",
+  "summary": "Verify requested outcomes across service boundaries",
+  "description": "Turn applied plans and fresh inventory into explicit outcome evidence, partial results, and residual gaps.",
+  "scope": {
+    "read": [
+      "schemas/**",
+      "src/**",
+      "tests/fixtures/**"
+    ],
+    "modify": [
+      "src/arr_orchestrator/verify/**",
+      "tests/verify/**",
+      "docs/verification.md"
+    ]
+  },
+  "acceptance": [
+    "Verification re-discovers state rather than trusting apply responses.",
+    "Every requested outcome has verified, blocked, or rejected status with evidence.",
+    "Telegram summaries can be generated without exposing raw private data."
+  ],
+  "verification": [
+    "python3 -m unittest discover -s tests/verify -p \"test_*.py\"",
+    "bash scripts/check.sh"
+  ],
+  "claim": {
+    "agent": null,
+    "claimed_at": null
+  },
+  "work_status": "pending",
+  "review_status": "none",
+  "review_history": [],
+  "evidence": [],
+  "depends_on": [
+    "11-implement-bounded-apply"
+  ],
+  "priority": 12,
+  "delivery": "product_implementation_backlog"
+}

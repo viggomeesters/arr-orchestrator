@@ -1,0 +1,31 @@
+{
+  "schema": "go-workflow.repo-local.architecture-principles.v1",
+  "kind": "architecture_principles",
+  "project": "arr-orchestrator",
+  "principles": [
+    {
+      "id": "agent-first",
+      "statement": "Expose stable machine-readable commands and evidence before adding human dashboards.",
+      "rationale": "Telegram commands need deterministic operations rather than UI automation.",
+      "enforcement": "Schema tests and JSON output gates."
+    },
+    {
+      "id": "safe-control-plane",
+      "statement": "Treat every remote mutation as planned, bounded, reversible, and verified.",
+      "rationale": "Media stacks combine privileged APIs, storage paths, and destructive cleanup controls.",
+      "enforcement": "Plan/apply separation, backups, allowlists, and readback checks."
+    },
+    {
+      "id": "external-runtime-state",
+      "statement": "Store credentials, discovered topology, logs, caches, inventories, and generated plans outside Git.",
+      "rationale": "A public repository must never become a mirror of a private household stack.",
+      "enforcement": "Repository guards, synthetic fixtures, and XDG runtime paths."
+    },
+    {
+      "id": "api-over-ui",
+      "statement": "Use official service APIs and SSH-backed operations rather than browser automation whenever possible.",
+      "rationale": "APIs are testable, versionable, and observable.",
+      "enforcement": "Adapter contracts and capability discovery tests."
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "schema": "go-workflow.repo-local.task.v1",
+  "kind": "task",
+  "execution_mode": "agent",
+  "shareable_delivery": "none",
+  "id": "05-implement-prowlarr-readonly-adapter",
+  "project": "arr-orchestrator",
+  "status": "open",
+  "summary": "Implement the read-only Prowlarr adapter",
+  "description": "Add API version discovery and normalized read-only access to application sync state, indexer capabilities, and health using synthetic responses.",
+  "scope": {
+    "read": [
+      "schemas/**",
+      "src/**",
+      "docs/**"
+    ],
+    "modify": [
+      "src/arr_orchestrator/adapters/prowlarr.py",
+      "tests/adapters/test_prowlarr.py",
+      "tests/fixtures/prowlarr/**",
+      "docs/adapters/prowlarr.md"
+    ]
+  },
+  "acceptance": [
+    "Application links and sync settings normalize into the core capability model.",
+    "Indexer data is summarized without persisting sensitive query or history data.",
+    "Synthetic fixtures prove success, unsupported version, and redaction behavior."
+  ],
+  "verification": [
+    "python3 -m unittest tests.adapters.test_prowlarr",
+    "bash scripts/check.sh"
+  ],
+  "claim": {
+    "agent": null,
+    "claimed_at": null
+  },
+  "work_status": "pending",
+  "review_status": "none",
+  "review_history": [],
+  "evidence": [],
+  "depends_on": [
+    "02-build-arrctl-skeleton"
+  ],
+  "priority": 5,
+  "delivery": "product_implementation_backlog"
+}

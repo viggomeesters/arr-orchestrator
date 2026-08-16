@@ -1,0 +1,48 @@
+{
+  "schema": "go-workflow.repo-local.task.v1",
+  "kind": "task",
+  "execution_mode": "agent",
+  "shareable_delivery": "none",
+  "id": "13-implement-hermes-command-contract",
+  "project": "arr-orchestrator",
+  "status": "open",
+  "summary": "Define the Hermes and Telegram operation contract",
+  "description": "Map natural-language outcomes to deterministic arrctl operations, authority levels, concise progress, and evidence-backed final responses.",
+  "scope": {
+    "read": [
+      "docs/**",
+      "schemas/**",
+      "src/**",
+      ".go/**"
+    ],
+    "modify": [
+      "docs/hermes-integration.md",
+      "schemas/hermes-operation.schema.json",
+      "tests/integration/test_hermes_contract.py"
+    ]
+  },
+  "acceptance": [
+    "Common operator intents map to explicit read-only or mutation authority.",
+    "Destructive or ambiguous instructions stop at an explainable human gate.",
+    "Final response fixtures are concise and include evidence or a precise blocker."
+  ],
+  "verification": [
+    "python3 -m unittest tests.integration.test_hermes_contract",
+    "bash scripts/check.sh"
+  ],
+  "claim": {
+    "agent": null,
+    "claimed_at": null
+  },
+  "work_status": "pending",
+  "review_status": "none",
+  "review_history": [],
+  "evidence": [],
+  "depends_on": [
+    "12-implement-end-to-end-verify",
+    "06-implement-download-client-adapter",
+    "07-implement-media-server-adapter"
+  ],
+  "priority": 13,
+  "delivery": "product_implementation_backlog"
+}

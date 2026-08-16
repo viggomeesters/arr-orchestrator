@@ -1,0 +1,73 @@
+{
+  "schema": "go-workflow.repo-local.hierarchy.v1",
+  "kind": "hierarchy",
+  "project": "arr-orchestrator",
+  "epics": [
+    {
+      "id": "foundation",
+      "title": "Repository Foundation",
+      "features": [
+        {
+          "id": "public-readiness",
+          "title": "Public readiness and agent onboarding",
+          "tasks": [
+            "foundation-public-repository"
+          ]
+        }
+      ],
+      "tasks": []
+    },
+    {
+      "id": "control-plane",
+      "title": "Control Plane",
+      "features": [
+        {
+          "id": "inventory-doctor",
+          "title": "Read-only inventory and doctor",
+          "tasks": [
+            "01-define-core-contracts",
+            "08-implement-stack-inventory",
+            "09-implement-doctor-rules"
+          ]
+        },
+        {
+          "id": "plan-apply",
+          "title": "Declarative plan and apply",
+          "tasks": [
+            "02-build-arrctl-skeleton",
+            "10-implement-plan-engine",
+            "11-implement-bounded-apply",
+            "12-implement-end-to-end-verify",
+            "13-implement-hermes-command-contract",
+            "14-prove-synthetic-stack-e2e"
+          ]
+        }
+      ],
+      "tasks": []
+    },
+    {
+      "id": "service-adapters",
+      "title": "Service Adapters",
+      "features": [
+        {
+          "id": "arr-apis",
+          "title": "Sonarr Radarr Prowlarr adapters",
+          "tasks": [
+            "03-implement-sonarr-readonly-adapter",
+            "04-implement-radarr-readonly-adapter",
+            "05-implement-prowlarr-readonly-adapter"
+          ]
+        },
+        {
+          "id": "download-media",
+          "title": "Download client and media server adapters",
+          "tasks": [
+            "06-implement-download-client-adapter",
+            "07-implement-media-server-adapter"
+          ]
+        }
+      ],
+      "tasks": []
+    }
+  ]
+}

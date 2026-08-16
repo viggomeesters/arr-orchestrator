@@ -1,5 +1,5 @@
 {
-  "$schema": "../schemas/repo-vision-contract.schema.json",
+  "$schema": "https://viggomeesters.github.io/schemas/repo-vision-contract.schema.json",
   "schema_version": "1.0.0",
   "artifact_kind": "repo_design_vision_contract",
   "repo": {

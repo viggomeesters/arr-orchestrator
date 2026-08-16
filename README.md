@@ -51,7 +51,7 @@ Telegram instruction → agent → doctor → plan → apply → verify → conc
 | [`scripts/check.sh`](scripts/check.sh) | Complete local repository gate |
 | [`examples/`](examples/) | Synthetic, public-safe contract examples |
 
-## Start from a fresh clone
+## Installation
 
 Requirements: Git, Bash, Python 3.11+, and network access for the pinned Go workflow bootstrap on the first run.
 
@@ -64,6 +64,18 @@ bash scripts/check.sh
 ```
 
 The local gate uses only the Python standard library. The `./go` launcher resolves the exact pinned `go-workflow-stack` release from `.go/project.json` and caches it outside the repository.
+
+## Development
+
+Development is driven by the repo-local Go backlog rather than an informal issue list:
+
+```bash
+./go status . --json
+./go next .
+./go claim <task-id> --repo . --agent <agent-name>
+```
+
+Work only inside the claimed task scope, use synthetic fixtures, run the task-specific verification, and finish with `make check` plus a critic/recheck pass. See [Onboarding](docs/onboarding.md) and [Contributing](CONTRIBUTING.md) for the complete route.
 
 ## Agent workflow
 

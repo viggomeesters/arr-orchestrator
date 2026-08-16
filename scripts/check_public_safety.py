@@ -25,6 +25,18 @@ for p in ROOT.rglob('*'):
     text=p.read_text(encoding='utf-8',errors='ignore')
     for label,pattern in patterns.items():
         if pattern.search(text): errors.append(f'{label} pattern in {p.relative_to(ROOT)}')
+for manifest_path in (ROOT / '.go' / 'deliveries').glob('*/manifest.json'):
+    try:
+        manifest = __import__('json').loads(manifest_path.read_text(encoding='utf-8'))
+    except Exception as exc:
+        errors.append(f'invalid delivery manifest {manifest_path.relative_to(ROOT)}: {exc}')
+        continue
+    disclosure = manifest.get('disclosure') or {}
+    if disclosure.get('class') != 'public' or disclosure.get('scan_status') != 'passed':
+        errors.append(
+            f'non-public delivery tracked: {manifest_path.relative_to(ROOT)} '
+            f'(class={disclosure.get("class")}, scan_status={disclosure.get("scan_status")})'
+        )
 if errors:
     print('\n'.join(sorted(set(errors))),file=sys.stderr); raise SystemExit(1)
 print(f'public safety check: ok ({len(tracked)} tracked paths inspected)')

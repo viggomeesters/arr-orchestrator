@@ -1,0 +1,94 @@
+{
+  "schema": "go-workflow.repo-local.task.v1",
+  "kind": "task",
+  "execution_mode": "agent",
+  "shareable_delivery": "none",
+  "id": "foundation-public-delivery-boundary",
+  "project": "arr-orchestrator",
+  "status": "done",
+  "summary": "Remove non-public generated delivery state and enforce its boundary",
+  "description": "Correct the automatically generated restricted delivery artifact so the public repository tracks only disclosure-passed shareable artifacts, while preserving task and event provenance.",
+  "scope": {
+    "read": [
+      ".go/**",
+      "scripts/check_public_safety.py",
+      "docs/security-model.md"
+    ],
+    "modify": [
+      ".go/**",
+      "scripts/check_public_safety.py",
+      "docs/security-model.md"
+    ]
+  },
+  "acceptance": [
+    "No restricted or disclosure-blocked delivery artifact remains in the current public tree.",
+    "The public-safety gate rejects tracked delivery manifests unless disclosure is public and scan_status is passed.",
+    "Historical review provenance remains explicit and the original foundation task no longer requests a generated shareable delivery."
+  ],
+  "verification": [
+    "python3 scripts/check_public_safety.py",
+    "bash scripts/check.sh"
+  ],
+  "claim": {
+    "agent": "hermes",
+    "claimed_at": "2026-08-16T11:16:30+02:00"
+  },
+  "work_status": "completed",
+  "review_status": "approved",
+  "review_history": [
+    {
+      "created_at": "2026-08-16T11:19:11+02:00",
+      "agent": "hermes",
+      "status": "approved",
+      "evidence": "VERDICT A: the correction removes the contradictory restricted/blocked delivery artifact, preserves historical provenance, changes the original foundation task contract to shareable_delivery none, and adds a negative-test-backed public-safety gate.",
+      "transaction_id": "2637a23817444c04b29e1fa9964e24b8"
+    }
+  ],
+  "evidence": [
+    {
+      "schema": "go-workflow.finish-evidence.v1",
+      "created_at": "2026-08-16T11:19:11+02:00",
+      "task_id": "foundation-public-delivery-boundary",
+      "agent": "hermes",
+      "summary": "changed_files=.go/tasks/done/foundation-public-repository.json,.go/tasks/active/foundation-public-delivery-boundary.json,.go/hierarchy.json,.go/decisions/events.jsonl,.go/runs/events.jsonl,.go/deliveries/foundation-v1/index.html,.go/deliveries/foundation-v1/manifest.json,scripts/check_public_safety.py,docs/security-model.md,CHANGELOG.md; verification_command=negative restricted-delivery fixture && python3 scripts/check_public_safety.py && bash scripts/check.sh && ./go validate .; verification_result=passed: restricted/blocked fixture was rejected, clean tree safety check passed, full repository check passed, and current .go delivery file count is zero; critic=approved design correction: canonical JSON evidence remains while non-public generated HTML is excluded from the public tree; runtime=hermes; model=gpt-5.6-sol; billing_mode=subscription; owner=viggo",
+      "changed_files": [
+        ".go/tasks/done/foundation-public-repository.json",
+        ".go/tasks/active/foundation-public-delivery-boundary.json",
+        ".go/hierarchy.json",
+        ".go/decisions/events.jsonl",
+        ".go/runs/events.jsonl",
+        ".go/deliveries/foundation-v1/index.html",
+        ".go/deliveries/foundation-v1/manifest.json",
+        "scripts/check_public_safety.py",
+        "docs/security-model.md",
+        "CHANGELOG.md"
+      ],
+      "no_diff": false,
+      "verification": {
+        "command": "negative restricted-delivery fixture && python3 scripts/check_public_safety.py && bash scripts/check.sh && ./go validate .",
+        "result": "passed: restricted/blocked fixture was rejected, clean tree safety check passed, full repository check passed, and current .go delivery file count is zero"
+      },
+      "runtime": {
+        "agent": "hermes",
+        "runtime": "hermes",
+        "model": "gpt-5.6-sol",
+        "billing_mode": "subscription"
+      },
+      "usage": {
+        "schema": "go-workflow.usage-attribution.v1",
+        "runtime_kind": "hermes",
+        "billing_mode": "subscription",
+        "owner": "viggo",
+        "model": "gpt-5.6-sol",
+        "token_estimate": null,
+        "api_equivalent_cost_usd": null,
+        "provider_invoice_cost_usd": null,
+        "cost_label": "api_equivalent_not_invoice_cost"
+      },
+      "review": {
+        "outcome": "approved design correction: canonical JSON evidence remains while non-public generated HTML is excluded from the public tree",
+        "skip_reason": null
+      }
+    }
+  ]
+}

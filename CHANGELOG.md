@@ -10,5 +10,6 @@ All notable changes are documented here. This project follows Semantic Versionin
 - Repo-local `.go` product vision, architecture principles, hierarchy, backlog, decisions, and evidence contract.
 - Tested `docs/vision.json` design and engineering contract with JSON Schema validation.
 - Local validation, documentation, hero, and public-safety gates.
+- Public-delivery guard that rejects restricted, link-private, or disclosure-blocked generated artifacts from the tracked tree.
 - Synthetic desired-state example and explicit external-runtime-state boundary.
 - README hero and social preview assets.

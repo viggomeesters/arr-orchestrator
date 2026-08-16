@@ -11,7 +11,8 @@
           "id": "public-readiness",
           "title": "Public readiness and agent onboarding",
           "tasks": [
-            "foundation-public-repository"
+            "foundation-public-repository",
+            "foundation-public-delivery-boundary"
           ]
         }
       ],

@@ -31,6 +31,11 @@
 - API readback and end-to-end verification after changes;
 - repository and history secret scanning before publication.
 
+Generated workflow deliveries are tracked only when their manifest declares
+`disclosure.class: public` and `disclosure.scan_status: passed`. Restricted,
+link-private, or scan-blocked delivery HTML belongs outside the public tree;
+the canonical task and JSONL evidence remain sufficient for repository audit.
+
 ## Out of scope at foundation release
 
 The repository does not yet connect to a live stack or perform remote mutations. Those capabilities require their own claimed Go tasks, tests, security review, and evidence.

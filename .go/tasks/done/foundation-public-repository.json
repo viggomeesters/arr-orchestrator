@@ -2,7 +2,7 @@
   "schema": "go-workflow.repo-local.task.v1",
   "kind": "task",
   "execution_mode": "agent",
-  "shareable_delivery": "required",
+  "shareable_delivery": "none",
   "id": "foundation-public-repository",
   "project": "arr-orchestrator",
   "status": "done",
@@ -48,7 +48,8 @@
         "html": ".go/deliveries/foundation-v1/index.html",
         "manifest": ".go/deliveries/foundation-v1/manifest.json",
         "source_sha256": "f98fd1db599be07fdb4d217916cb107bcbbbabc884637931013239005da3c466",
-        "html_sha256": "779da9e8da8d015d3dc38c1c2c77cb45b024dd242f575704d484d70bd4785c34"
+        "html_sha256": "779da9e8da8d015d3dc38c1c2c77cb45b024dd242f575704d484d70bd4785c34",
+        "retention": "removed_from_current_tree_public_safety"
       }
     }
   ],
@@ -109,5 +110,6 @@
         "skip_reason": null
       }
     }
-  ]
+  ],
+  "delivery_retention_policy": "The automatic foundation-v1 delivery was removed from the current public tree because its disclosure scan was blocked; task/evidence JSON remains canonical."
 }

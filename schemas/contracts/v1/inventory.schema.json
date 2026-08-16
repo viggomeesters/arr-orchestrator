@@ -1,0 +1,230 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:arr-orchestrator:schema:inventory:v1",
+  "title": "Normalized inventory",
+  "description": "Arr Orchestrator normalized inventory contract, version 1.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "artifact_kind",
+    "inventory_id",
+    "observed_at",
+    "services",
+    "storage",
+    "connections"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "1.0.0"
+    },
+    "artifact_kind": {
+      "const": "inventory"
+    },
+    "inventory_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$",
+      "minLength": 2,
+      "maxLength": 128
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "services": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$": {
+          "$ref": "#/$defs/serviceInventory"
+        }
+      }
+    },
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$": {
+          "$ref": "#/$defs/storage"
+        }
+      }
+    },
+    "connections": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*:[a-z][a-z0-9_]*:[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$": {
+          "$ref": "#/$defs/connection"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "serviceInventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "version",
+        "capabilities_ref",
+        "resources"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "sonarr",
+            "radarr",
+            "prowlarr",
+            "qbittorrent",
+            "sabnzbd",
+            "jellyfin",
+            "plex",
+            "bazarr",
+            "seerr",
+            "ssh"
+          ]
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$"
+        },
+        "capabilities_ref": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$",
+          "minLength": 2,
+          "maxLength": 128
+        },
+        "resources": {
+          "type": "object",
+          "additionalProperties": false,
+          "patternProperties": {
+            "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$": {
+              "$ref": "#/$defs/resource"
+            }
+          }
+        }
+      }
+    },
+    "resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resource_type",
+        "attributes"
+      ],
+      "properties": {
+        "resource_type": {
+          "type": "string",
+          "enum": [
+            "root_folder",
+            "quality_profile",
+            "download_client",
+            "indexer",
+            "application",
+            "path_mapping",
+            "library",
+            "category"
+          ]
+        },
+        "attributes": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "path_ref": {
+              "type": "string",
+              "pattern": "^mount:[a-z][a-z0-9-]*(?:/[a-zA-Z0-9._-]+)*$"
+            },
+            "writable": {
+              "type": "boolean"
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "category": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$",
+              "minLength": 2,
+              "maxLength": 128
+            },
+            "profile_ref": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$",
+              "minLength": 2,
+              "maxLength": 128
+            },
+            "protocol": {
+              "type": "string",
+              "enum": [
+                "torrent",
+                "usenet",
+                "http",
+                "api"
+              ]
+            },
+            "mount_id": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$",
+              "minLength": 2,
+              "maxLength": 128
+            },
+            "sync_mode": {
+              "type": "string",
+              "enum": [
+                "full",
+                "add_only",
+                "manual"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "filesystem_id",
+        "supports_hardlinks"
+      ],
+      "properties": {
+        "filesystem_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$",
+          "minLength": 2,
+          "maxLength": 128
+        },
+        "supports_hardlinks": {
+          "type": "boolean"
+        },
+        "writable": {
+          "type": "boolean"
+        }
+      }
+    },
+    "connection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "connected",
+            "degraded",
+            "missing",
+            "blocked"
+          ]
+        },
+        "resource_ref": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$",
+          "minLength": 2,
+          "maxLength": 128
+        }
+      }
+    }
+  }
+}

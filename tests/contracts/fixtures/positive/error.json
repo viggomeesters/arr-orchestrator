@@ -1,0 +1,16 @@
+{
+  "contract_version": "1.0.0",
+  "artifact_kind": "error",
+  "error_id": "err-001",
+  "code": "PLAN_STALE",
+  "category": "policy",
+  "severity": "blocker",
+  "message": "The inventory digest no longer matches the approved plan.",
+  "retryable": true,
+  "owner": "plan-engine",
+  "details": {
+    "plan_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "reason": "inventory_changed"
+  },
+  "redacted": true
+}

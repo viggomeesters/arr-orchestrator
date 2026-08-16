@@ -1,0 +1,21 @@
+{
+  "contract_version": "1.0.0",
+  "artifact_kind": "plan",
+  "plan_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "created_at": "2026-08-16T10:02:00Z",
+  "inventory_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "desired_state_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "status": "ready",
+  "operations": {
+    "radarr-main:download_client:legacy-client:present": {
+      "action": "delete",
+      "risk": "destructive",
+      "requires_human_approval": false,
+      "change": {
+        "before": true,
+        "after": false
+      }
+    }
+  },
+  "blocked_assumptions": []
+}

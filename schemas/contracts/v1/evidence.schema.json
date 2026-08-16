@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:arr-orchestrator:schema:evidence:v1",
+  "title": "Verification evidence",
+  "description": "Arr Orchestrator verification evidence contract, version 1.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "artifact_kind",
+    "evidence_id",
+    "observed_at",
+    "source",
+    "assertion",
+    "redacted",
+    "content_digest"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "1.0.0"
+    },
+    "artifact_kind": {
+      "const": "evidence"
+    },
+    "evidence_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$",
+      "minLength": 2,
+      "maxLength": 128
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "service_id",
+        "capability"
+      ],
+      "properties": {
+        "service_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$",
+          "minLength": 2,
+          "maxLength": 128
+        },
+        "capability": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*(?:\\.[a-z][a-z0-9-]*)+$"
+        },
+        "operation_ref": {
+          "type": "string",
+          "pattern": "^(?!.*(?:api[._-]?key|private[._-]?key|access[._-]?key|password|token|secret|credential))[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*:(?:root_folder|quality_profile|download_client|indexer|application|path_mapping|library|category):[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*:[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        }
+      }
+    },
+    "assertion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "status",
+        "subject_ref",
+        "summary"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "capability_readback",
+            "configuration_readback",
+            "cross_service_check",
+            "end_to_end_check"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "verified",
+            "failed",
+            "partial",
+            "blocked"
+          ]
+        },
+        "subject_ref": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$",
+          "minLength": 2,
+          "maxLength": 128
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "residual_gap": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      }
+    },
+    "redacted": {
+      "const": true
+    },
+    "content_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    }
+  }
+}

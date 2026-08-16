@@ -1,0 +1,23 @@
+{
+  "contract_version": "1.0.0",
+  "artifact_kind": "findings",
+  "inventory_id": "inv-01",
+  "evaluated_at": "2026-08-16T10:01:00Z",
+  "findings": {
+    "finding-001": {
+      "rule_id": "paths.same-filesystem",
+      "status": "pass",
+      "code": "PATHS_COMPATIBLE",
+      "message": "Download and media references resolve to one filesystem identity.",
+      "owner": "storage",
+      "evidence_refs": [
+        "evidence:path-map-01"
+      ]
+    }
+  },
+  "summary": {
+    "pass": 1,
+    "warn": 0,
+    "block": 0
+  }
+}

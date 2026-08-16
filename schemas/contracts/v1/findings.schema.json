@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:arr-orchestrator:schema:findings:v1",
+  "title": "Diagnosis findings",
+  "description": "Arr Orchestrator diagnosis findings contract, version 1.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "artifact_kind",
+    "inventory_id",
+    "evaluated_at",
+    "findings",
+    "summary"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "1.0.0"
+    },
+    "artifact_kind": {
+      "const": "findings"
+    },
+    "inventory_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$",
+      "minLength": 2,
+      "maxLength": 128
+    },
+    "evaluated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "findings": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$": {
+          "$ref": "#/$defs/finding"
+        }
+      }
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    }
+  },
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rule_id",
+        "status",
+        "code",
+        "message",
+        "owner",
+        "evidence_refs"
+      ],
+      "properties": {
+        "rule_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*(?:\\.[a-z][a-z0-9-]*)+$"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pass",
+            "warn",
+            "block"
+          ]
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]{2,63}$"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "owner": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$",
+          "minLength": 2,
+          "maxLength": 128
+        },
+        "evidence_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$",
+            "minLength": 2,
+            "maxLength": 128
+          },
+          "maxItems": 32
+        },
+        "remediation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pass",
+        "warn",
+        "block"
+      ],
+      "properties": {
+        "pass": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "warn": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "block": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

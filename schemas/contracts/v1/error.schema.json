@@ -1,0 +1,326 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:arr-orchestrator:schema:error:v1",
+  "title": "Typed error",
+  "description": "Arr Orchestrator typed error contract, version 1.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "artifact_kind",
+    "error_id",
+    "code",
+    "category",
+    "severity",
+    "message",
+    "retryable",
+    "owner",
+    "details",
+    "redacted"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "1.0.0"
+    },
+    "artifact_kind": {
+      "const": "error"
+    },
+    "error_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$",
+      "minLength": 2,
+      "maxLength": 128
+    },
+    "code": {
+      "type": "string",
+      "enum": [
+        "CONFIG_INVALID",
+        "AUTH_MISSING",
+        "SERVICE_UNREACHABLE",
+        "VERSION_UNSUPPORTED",
+        "CAPABILITY_MISSING",
+        "PATH_AMBIGUOUS",
+        "AUTHORITY_REQUIRED",
+        "PLAN_STALE",
+        "BACKUP_FAILED",
+        "APPLY_FAILED",
+        "VERIFICATION_FAILED",
+        "PRIVATE_DATA_REDACTED"
+      ]
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "configuration",
+        "authentication",
+        "connectivity",
+        "capability",
+        "topology",
+        "policy",
+        "mutation",
+        "verification",
+        "privacy"
+      ]
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "warning",
+        "error",
+        "blocker"
+      ]
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "retryable": {
+      "type": "boolean"
+    },
+    "owner": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$",
+      "minLength": 2,
+      "maxLength": 128
+    },
+    "details": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "plan_ref": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "service_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$",
+          "minLength": 2,
+          "maxLength": 128
+        },
+        "capability": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*(?:\\.[a-z][a-z0-9-]*)+$"
+        },
+        "reason": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$",
+          "minLength": 2,
+          "maxLength": 128
+        },
+        "required_authority": {
+          "type": "string",
+          "enum": [
+            "operator",
+            "explicit_human"
+          ]
+        },
+        "expected_version": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "observed_version": {
+          "type": "string",
+          "maxLength": 64
+        }
+      }
+    },
+    "redacted": {
+      "const": true
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "code": {
+            "enum": [
+              "CONFIG_INVALID"
+            ]
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "then": {
+        "properties": {
+          "category": {
+            "const": "configuration"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "code": {
+            "enum": [
+              "AUTH_MISSING"
+            ]
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "then": {
+        "properties": {
+          "category": {
+            "const": "authentication"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "code": {
+            "enum": [
+              "SERVICE_UNREACHABLE"
+            ]
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "then": {
+        "properties": {
+          "category": {
+            "const": "connectivity"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "code": {
+            "enum": [
+              "VERSION_UNSUPPORTED",
+              "CAPABILITY_MISSING"
+            ]
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "then": {
+        "properties": {
+          "category": {
+            "const": "capability"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "code": {
+            "enum": [
+              "PATH_AMBIGUOUS"
+            ]
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "then": {
+        "properties": {
+          "category": {
+            "const": "topology"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "code": {
+            "enum": [
+              "AUTHORITY_REQUIRED",
+              "PLAN_STALE"
+            ]
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "then": {
+        "properties": {
+          "category": {
+            "const": "policy"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "code": {
+            "enum": [
+              "BACKUP_FAILED",
+              "APPLY_FAILED"
+            ]
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "then": {
+        "properties": {
+          "category": {
+            "const": "mutation"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "code": {
+            "enum": [
+              "VERIFICATION_FAILED"
+            ]
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "then": {
+        "properties": {
+          "category": {
+            "const": "verification"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "code": {
+            "enum": [
+              "PRIVATE_DATA_REDACTED"
+            ]
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "then": {
+        "properties": {
+          "category": {
+            "const": "privacy"
+          }
+        }
+      }
+    }
+  ]
+}

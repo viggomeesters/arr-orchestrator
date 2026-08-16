@@ -1,0 +1,19 @@
+{
+  "contract_version": "1.0.0",
+  "artifact_kind": "desired_state",
+  "profile_id": "bad",
+  "services": {
+    "sonarr-main": {
+      "kind": "sonarr",
+      "api_key": "secret-value",
+      "desired": {},
+      "secret_ref": "env:SONARR_API_KEY"
+    }
+  },
+  "media_roots": {},
+  "policies": {
+    "hardlinks_required": true,
+    "plan_approval": "risk_based",
+    "deletion": "explicit_only"
+  }
+}

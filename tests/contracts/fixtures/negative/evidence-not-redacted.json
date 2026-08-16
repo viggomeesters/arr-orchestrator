@@ -1,0 +1,18 @@
+{
+  "contract_version": "1.0.0",
+  "artifact_kind": "evidence",
+  "evidence_id": "evidence:bad",
+  "observed_at": "2026-08-16T10:03:00Z",
+  "source": {
+    "service_id": "sonarr-main",
+    "capability": "system.status"
+  },
+  "assertion": {
+    "type": "configuration_readback",
+    "status": "verified",
+    "subject_ref": "service:sonarr-main",
+    "summary": "Readback succeeded."
+  },
+  "redacted": false,
+  "content_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+}

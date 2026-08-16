@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:arr-orchestrator:schema:desired-state:v1",
+  "title": "Desired state",
+  "description": "Arr Orchestrator desired state contract, version 1.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "artifact_kind",
+    "profile_id",
+    "services",
+    "media_roots",
+    "policies"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "1.0.0"
+    },
+    "artifact_kind": {
+      "const": "desired_state"
+    },
+    "profile_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$",
+      "minLength": 2,
+      "maxLength": 128
+    },
+    "services": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$": {
+          "$ref": "#/$defs/service"
+        }
+      },
+      "minProperties": 1
+    },
+    "media_roots": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$": {
+          "$ref": "#/$defs/mediaRoot"
+        }
+      }
+    },
+    "policies": {
+      "$ref": "#/$defs/policies"
+    }
+  },
+  "$defs": {
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "secret_ref",
+        "desired"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "sonarr",
+            "radarr",
+            "prowlarr",
+            "qbittorrent",
+            "sabnzbd",
+            "jellyfin",
+            "plex",
+            "bazarr",
+            "seerr",
+            "ssh"
+          ]
+        },
+        "secret_ref": {
+          "type": "string",
+          "pattern": "^(?:env:[A-Z][A-Z0-9_]*|(?:file|secret):(?!.*\\.\\.)(?:[A-Za-z0-9_-]+)(?:/[A-Za-z0-9_.-]+)*)$",
+          "minLength": 5,
+          "maxLength": 256
+        },
+        "desired": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "quality_profile": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$",
+              "minLength": 2,
+              "maxLength": 128
+            },
+            "root_ref": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$",
+              "minLength": 2,
+              "maxLength": 128
+            },
+            "category": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$",
+              "minLength": 2,
+              "maxLength": 128
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "sync_mode": {
+              "type": "string",
+              "enum": [
+                "full",
+                "add_only",
+                "manual"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "mediaRoot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "purpose",
+        "path_ref"
+      ],
+      "properties": {
+        "purpose": {
+          "type": "string",
+          "enum": [
+            "series",
+            "movies",
+            "music",
+            "downloads",
+            "transcode"
+          ]
+        },
+        "path_ref": {
+          "type": "string",
+          "pattern": "^mount:[a-z][a-z0-9-]*(?:/[a-zA-Z0-9._-]+)*$",
+          "maxLength": 256
+        }
+      }
+    },
+    "policies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hardlinks_required",
+        "plan_approval",
+        "deletion"
+      ],
+      "properties": {
+        "hardlinks_required": {
+          "type": "boolean"
+        },
+        "plan_approval": {
+          "type": "string",
+          "enum": [
+            "always",
+            "risk_based",
+            "explicit"
+          ]
+        },
+        "deletion": {
+          "const": "explicit_only"
+        }
+      }
+    }
+  }
+}

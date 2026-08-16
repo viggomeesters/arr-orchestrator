@@ -1,0 +1,38 @@
+{
+  "contract_version": "1.0.0",
+  "artifact_kind": "desired_state",
+  "profile_id": "home-hd",
+  "services": {
+    "sonarr-main": {
+      "kind": "sonarr",
+      "secret_ref": "env:SONARR_API_KEY",
+      "desired": {
+        "quality_profile": "hd-balanced",
+        "root_ref": "series-main"
+      }
+    },
+    "radarr-main": {
+      "kind": "radarr",
+      "secret_ref": "file:radarr/api-key",
+      "desired": {
+        "quality_profile": "hd-balanced",
+        "root_ref": "movies-main"
+      }
+    }
+  },
+  "media_roots": {
+    "series-main": {
+      "purpose": "series",
+      "path_ref": "mount:media/series"
+    },
+    "movies-main": {
+      "purpose": "movies",
+      "path_ref": "mount:media/movies"
+    }
+  },
+  "policies": {
+    "hardlinks_required": true,
+    "plan_approval": "risk_based",
+    "deletion": "explicit_only"
+  }
+}

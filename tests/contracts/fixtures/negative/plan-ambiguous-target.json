@@ -1,0 +1,20 @@
+{
+  "contract_version": "1.0.0",
+  "artifact_kind": "plan",
+  "plan_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "created_at": "2026-08-16T10:02:00Z",
+  "inventory_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "desired_state_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "status": "ready",
+  "operations": {
+    "sonarr-main:quality_profile:cutoff": {
+      "action": "update",
+      "risk": "safe",
+      "requires_human_approval": false,
+      "change": {
+        "after": "bluray-1080p"
+      }
+    }
+  },
+  "blocked_assumptions": []
+}

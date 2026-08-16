@@ -1,0 +1,10 @@
+{
+  "contract_version": "1.0.0",
+  "artifact_kind": "inventory",
+  "inventory_id": "bad",
+  "observed_at": "2026-08-16T10:00:00Z",
+  "hostname": "private-nuc",
+  "services": {},
+  "storage": {},
+  "connections": {}
+}

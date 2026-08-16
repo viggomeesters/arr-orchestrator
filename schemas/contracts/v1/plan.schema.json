@@ -1,0 +1,350 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:arr-orchestrator:schema:plan:v1",
+  "title": "Mutation plan",
+  "description": "Arr Orchestrator mutation plan contract, version 1.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "artifact_kind",
+    "plan_id",
+    "created_at",
+    "inventory_digest",
+    "desired_state_digest",
+    "status",
+    "operations",
+    "blocked_assumptions"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "1.0.0"
+    },
+    "artifact_kind": {
+      "const": "plan"
+    },
+    "plan_id": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "inventory_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "desired_state_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "blocked",
+        "pending_approval",
+        "ready",
+        "applied",
+        "superseded"
+      ]
+    },
+    "operations": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^(?!.*(?:api[._-]?key|private[._-]?key|access[._-]?key|password|token|secret|credential))[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*:(?:root_folder|quality_profile|download_client|indexer|application|path_mapping|library|category):[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*:[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$": {
+          "$ref": "#/$defs/operation"
+        }
+      }
+    },
+    "blocked_assumptions": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500
+      },
+      "maxItems": 64
+    }
+  },
+  "$defs": {
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "risk",
+        "requires_human_approval",
+        "change"
+      ],
+      "properties": {
+        "action": {
+          "enum": [
+            "create",
+            "update",
+            "delete",
+            "link",
+            "unlink"
+          ]
+        },
+        "risk": {
+          "enum": [
+            "safe",
+            "risky",
+            "destructive"
+          ]
+        },
+        "requires_human_approval": {
+          "type": "boolean"
+        },
+        "approval": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "pending",
+                "approved"
+              ]
+            },
+            "authority_ref": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$"
+            },
+            "evidence_ref": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$"
+            },
+            "decided_at": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "approved"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "then": {
+                "required": [
+                  "authority_ref",
+                  "evidence_ref",
+                  "decided_at"
+                ]
+              }
+            }
+          ]
+        },
+        "change": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "after"
+          ],
+          "properties": {
+            "before": {
+              "anyOf": [
+                {
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean",
+                    "null"
+                  ]
+                },
+                {
+                  "type": "array",
+                  "maxItems": 64,
+                  "items": {
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean",
+                      "null"
+                    ]
+                  }
+                }
+              ]
+            },
+            "after": {
+              "anyOf": [
+                {
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean",
+                    "null"
+                  ]
+                },
+                {
+                  "type": "array",
+                  "maxItems": 64,
+                  "items": {
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean",
+                      "null"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "delete"
+              }
+            },
+            "required": [
+              "action"
+            ]
+          },
+          "then": {
+            "properties": {
+              "risk": {
+                "const": "destructive"
+              },
+              "requires_human_approval": {
+                "const": true
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "risk": {
+                "enum": [
+                  "risky",
+                  "destructive"
+                ]
+              }
+            },
+            "required": [
+              "risk"
+            ]
+          },
+          "then": {
+            "properties": {
+              "requires_human_approval": {
+                "const": true
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "requires_human_approval": {
+                "const": true
+              }
+            },
+            "required": [
+              "requires_human_approval"
+            ]
+          },
+          "then": {
+            "required": [
+              "approval"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "approval"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "blocked_assumptions": {
+            "minItems": 1
+          }
+        },
+        "required": [
+          "blocked_assumptions"
+        ]
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "const": "blocked"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "ready",
+              "applied"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "blocked_assumptions": {
+            "maxItems": 0
+          },
+          "operations": {
+            "patternProperties": {
+              "^(?!.*(?:api[._-]?key|private[._-]?key|access[._-]?key|password|token|secret|credential))[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*:(?:root_folder|quality_profile|download_client|indexer|application|path_mapping|library|category):[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*:[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$": {
+                "if": {
+                  "required": [
+                    "approval"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "approval": {
+                      "properties": {
+                        "status": {
+                          "const": "approved"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

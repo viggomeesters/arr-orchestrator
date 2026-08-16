@@ -1,0 +1,16 @@
+{
+  "contract_version": "1.0.0",
+  "artifact_kind": "error",
+  "error_id": "err-mismatch",
+  "code": "AUTH_MISSING",
+  "category": "policy",
+  "severity": "blocker",
+  "message": "Authentication is unavailable.",
+  "retryable": false,
+  "owner": "sonarr-adapter",
+  "details": {
+    "service_id": "sonarr-main",
+    "reason": "secret_ref_missing"
+  },
+  "redacted": true
+}

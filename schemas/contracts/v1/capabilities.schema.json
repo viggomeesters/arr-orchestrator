@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:arr-orchestrator:schema:capabilities:v1",
+  "title": "Capabilities",
+  "description": "Arr Orchestrator capabilities contract, version 1.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "artifact_kind",
+    "observed_at",
+    "services"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "1.0.0"
+    },
+    "artifact_kind": {
+      "const": "capabilities"
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "services": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$": {
+          "$ref": "#/$defs/serviceCapability"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "serviceCapability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "api_version",
+        "reachable",
+        "features",
+        "health"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "sonarr",
+            "radarr",
+            "prowlarr",
+            "qbittorrent",
+            "sabnzbd",
+            "jellyfin",
+            "plex",
+            "bazarr",
+            "seerr",
+            "ssh"
+          ]
+        },
+        "api_version": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$"
+        },
+        "reachable": {
+          "type": "boolean"
+        },
+        "features": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*(?:\\.[a-z][a-z0-9-]*)+$"
+          },
+          "maxItems": 128
+        },
+        "health": {
+          "type": "string",
+          "enum": [
+            "healthy",
+            "degraded",
+            "unreachable",
+            "unsupported"
+          ]
+        },
+        "limitation_codes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*(?:\\.[a-z][a-z0-9-]*)+$"
+          },
+          "maxItems": 32
+        }
+      }
+    }
+  }
+}

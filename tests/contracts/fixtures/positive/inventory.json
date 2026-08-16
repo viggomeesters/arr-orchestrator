@@ -1,0 +1,29 @@
+{
+  "contract_version": "1.0.0",
+  "artifact_kind": "inventory",
+  "inventory_id": "inv-01",
+  "observed_at": "2026-08-16T10:00:00Z",
+  "services": {
+    "sonarr-main": {
+      "kind": "sonarr",
+      "version": "4.0.0",
+      "capabilities_ref": "cap:sonarr-main",
+      "resources": {
+        "series-main": {
+          "resource_type": "root_folder",
+          "attributes": {
+            "path_ref": "mount:media/series",
+            "writable": true
+          }
+        }
+      }
+    }
+  },
+  "storage": {
+    "media": {
+      "filesystem_id": "fs-media",
+      "supports_hardlinks": true
+    }
+  },
+  "connections": {}
+}

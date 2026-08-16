@@ -1,0 +1,17 @@
+{
+  "contract_version": "1.0.0",
+  "artifact_kind": "capabilities",
+  "observed_at": "2026-08-16T10:00:00Z",
+  "services": {
+    "sonarr-main": {
+      "kind": "sonarr",
+      "api_version": "v3",
+      "reachable": true,
+      "features": [
+        "root-folders.read",
+        "quality-profiles.read"
+      ],
+      "health": "healthy"
+    }
+  }
+}

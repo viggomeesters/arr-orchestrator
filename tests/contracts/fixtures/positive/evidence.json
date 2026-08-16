@@ -1,0 +1,19 @@
+{
+  "contract_version": "1.0.0",
+  "artifact_kind": "evidence",
+  "evidence_id": "evidence:path-map-01",
+  "observed_at": "2026-08-16T10:03:00Z",
+  "source": {
+    "service_id": "sonarr-main",
+    "capability": "root-folders.read",
+    "operation_ref": "sonarr-main:quality_profile:hd-balanced:cutoff"
+  },
+  "assertion": {
+    "type": "configuration_readback",
+    "status": "verified",
+    "subject_ref": "root_folder:series-main",
+    "summary": "Configured root reference matches desired state."
+  },
+  "redacted": true,
+  "content_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+}

@@ -26,12 +26,8 @@
           "reason": "Service configuration."
         },
         {
-          "target": "/data/media/tv",
-          "reason": "Synthetic television library."
-        },
-        {
-          "target": "/data/downloads",
-          "reason": "Synthetic completed downloads."
+          "target": "/data",
+          "reason": "Single synthetic data mount keeps downloads and television media on one mount boundary for real hardlinks."
         }
       ],
       "tmpfs_mounts": [
@@ -67,12 +63,8 @@
           "reason": "Service configuration."
         },
         {
-          "target": "/data/media/movies",
-          "reason": "Synthetic movie library."
-        },
-        {
-          "target": "/data/downloads",
-          "reason": "Synthetic completed downloads."
+          "target": "/data",
+          "reason": "Single synthetic data mount keeps downloads and movie media on one mount boundary for real hardlinks."
         }
       ],
       "tmpfs_mounts": [

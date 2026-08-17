@@ -82,11 +82,15 @@ class LabContractTests(unittest.TestCase):
             },
             "scenarios": [
                 "healthy",
-                "service-unavailable",
-                "malformed-json",
-                "unsupported-api-version",
-                "stale-readback",
+                "category-mismatch",
+                "root-folder-mismatch",
+                "application-sync-mismatch",
+                "path-mapping-mismatch",
                 "hardlink-cross-device",
+                "service-unavailable",
+                "unsupported-api-version",
+                "stale-plan",
+                "destructive-denial",
             ],
         }
 

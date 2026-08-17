@@ -1,0 +1,4 @@
+services:
+  prowlarr:
+    labels:
+      com.viggomeesters.arr-orchestrator.scenario: service-unavailable

@@ -1,0 +1,9 @@
+{
+  "schema": "arr-orchestrator.lab-runner-fault.v1",
+  "scenario": "stale-plan",
+  "fault": {
+    "plan_inventory_revision": "plan-old",
+    "current_inventory_revision": "inventory-new"
+  },
+  "expected_finding": "stale_plan"
+}

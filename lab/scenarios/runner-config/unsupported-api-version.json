@@ -1,0 +1,9 @@
+{
+  "schema": "arr-orchestrator.lab-runner-fault.v1",
+  "scenario": "unsupported-api-version",
+  "fault": {
+    "advertised_api_version": "999.0",
+    "supported_api_versions": ["1.0"]
+  },
+  "expected_finding": "unsupported_api_version"
+}

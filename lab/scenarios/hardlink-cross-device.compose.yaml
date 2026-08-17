@@ -1,0 +1,54 @@
+services:
+  radarr-hardlink:
+    image: lscr.io/linuxserver/radarr:version-6.3.0.10514@sha256:263be1036419fcb38fc1cf76be90db8db4b0dc49fd492617b17cc58e9e0bf1b5
+    platform: linux/amd64
+    profiles: [services]
+    labels:
+      com.viggomeesters.arr-orchestrator.lab: "true"
+      com.viggomeesters.arr-orchestrator.lab-id: "${ARR_LAB_ID}"
+      com.viggomeesters.arr-orchestrator.scenario: hardlink-cross-device
+    environment:
+      TZ: Etc/UTC
+      UMASK: "022"
+    privileged: false
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    restart: "no"
+    networks: [private]
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 1.0
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+      - /run:rw,exec,nosuid,nodev,size=16m
+    volumes:
+      - type: bind
+        source: "${ARR_LAB_ROOT}/config/radarr-hardlink"
+        target: /config
+      - type: tmpfs
+        target: /data/media/movies
+        tmpfs:
+          size: 16777216
+          mode: 511
+      - type: bind
+        source: "${ARR_LAB_ROOT}/data/downloads"
+        target: /data/downloads
+    healthcheck:
+      test: [CMD-SHELL, "curl -fsS http://127.0.0.1:7878/ping >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 2s
+      retries: 12
+      start_period: 10s
+
+networks:
+  private:
+    name: "${COMPOSE_PROJECT_NAME}_private"
+    driver: bridge
+    internal: true
+    driver_opts:
+      com.docker.network.bridge.gateway_mode_ipv4: isolated
+    labels:
+      com.viggomeesters.arr-orchestrator.lab: "true"
+      com.viggomeesters.arr-orchestrator.lab-id: "${ARR_LAB_ID}"

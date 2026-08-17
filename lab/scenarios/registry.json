@@ -1,0 +1,65 @@
+{
+  "schema": "arr-orchestrator.lab-scenarios.v1",
+  "scenarios": [
+    {
+      "name": "healthy",
+      "driver": "controller-api",
+      "description": "Restore and verify the canonical bootstrapped baseline.",
+      "action": {"operation": "restore-baseline"}
+    },
+    {
+      "name": "category-mismatch",
+      "driver": "controller-api",
+      "description": "Replace the canonical qBittorrent category save path with a synthetic mismatch.",
+      "action": {"operation": "qbittorrent-category", "category": "arr-lab"}
+    },
+    {
+      "name": "root-folder-mismatch",
+      "driver": "controller-api",
+      "description": "Replace the canonical Sonarr root folder with a synthetic mismatch.",
+      "action": {"operation": "sonarr-root-folder"}
+    },
+    {
+      "name": "application-sync-mismatch",
+      "driver": "controller-api",
+      "description": "Disable the synthetic Sonarr application sync in Prowlarr.",
+      "action": {"operation": "prowlarr-application-sync", "implementation": "Sonarr"}
+    },
+    {
+      "name": "path-mapping-mismatch",
+      "driver": "controller-api",
+      "description": "Install one synthetic invalid Sonarr remote path mapping.",
+      "action": {"operation": "sonarr-path-mapping"}
+    },
+    {
+      "name": "hardlink-cross-device",
+      "driver": "host-compose",
+      "description": "Expose a committed tmpfs target whose device differs from the media bind mount.",
+      "action": {"operation": "compose-override", "override": "lab/scenarios/hardlink-cross-device.compose.yaml"}
+    },
+    {
+      "name": "service-unavailable",
+      "driver": "host-compose",
+      "description": "Stop only the exact labelled Prowlarr service through the trusted host authority.",
+      "action": {"operation": "compose-override", "override": "lab/scenarios/service-unavailable.compose.yaml"}
+    },
+    {
+      "name": "unsupported-api-version",
+      "driver": "runner-config",
+      "description": "Present a synthetic unsupported API version to the isolated runner.",
+      "action": {"operation": "runner-fault", "fault": "unsupported-api-version", "template": "lab/scenarios/runner-config/unsupported-api-version.json"}
+    },
+    {
+      "name": "stale-plan",
+      "driver": "runner-config",
+      "description": "Present a synthetic stale inventory fingerprint to the isolated runner.",
+      "action": {"operation": "runner-fault", "fault": "stale-plan", "template": "lab/scenarios/runner-config/stale-plan.json"}
+    },
+    {
+      "name": "destructive-denial",
+      "driver": "runner-config",
+      "description": "Present a synthetic destructive operation that policy must deny.",
+      "action": {"operation": "runner-fault", "fault": "destructive-denial", "template": "lab/scenarios/runner-config/destructive-denial.json"}
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "schema": "arr-orchestrator.lab-runner-fault.v1",
+  "scenario": "destructive-denial",
+  "fault": {
+    "operation": "delete",
+    "approval": "absent",
+    "policy_decision": "deny"
+  },
+  "expected_finding": "destructive_operation_denied"
+}

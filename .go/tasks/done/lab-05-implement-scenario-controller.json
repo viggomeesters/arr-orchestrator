@@ -1,0 +1,118 @@
+{
+  "schema": "go-workflow.repo-local.task.v1",
+  "kind": "task",
+  "execution_mode": "agent",
+  "shareable_delivery": "none",
+  "id": "lab-05-implement-scenario-controller",
+  "project": "arr-orchestrator",
+  "status": "done",
+  "summary": "Implement deterministic lab scenarios",
+  "description": "Provide an allowlisted controller that switches the disposable stack between the canonical healthy baseline and named broken states using one declared authority per scenario.",
+  "scope": {
+    "read": [
+      "docs/local-lab.md",
+      "lab/compose.yaml",
+      "lab/controller/bootstrap.py",
+      "lab/readiness.json",
+      "lab/security-matrix.json",
+      "scripts/lab.py",
+      "AGENTS.md",
+      ".go/project.json",
+      ".go/vision.json",
+      ".go/architecture-principles.json",
+      "docs/architecture.md",
+      "docs/security-model.md",
+      ".go/tasks/done/lab-04-bootstrap-services.json"
+    ],
+    "modify": [
+      ".dockerignore",
+      "lab/Dockerfile.controller",
+      "lab/controller/scenarios.py",
+      "lab/compose.yaml",
+      "lab/security-matrix.json",
+      "schemas/lab-manifest.schema.json",
+      "lab/scenarios/**",
+      "docs/local-lab.md",
+      "tests/lab/test_compose_contract.py",
+      "tests/lab/test_lab_contract.py",
+      "tests/lab/test_scenarios.py",
+      "tests/fixtures/lab/scenarios/**",
+      "scripts/lab.py"
+    ]
+  },
+  "acceptance": [
+    "Required scenarios cover category, root-folder, application-sync, path mapping, cross-device hardlink, unreachable service, unsupported version, stale plan, and destructive denial.",
+    "Every scenario declares exactly one driver: controller-api, host-compose, or runner-config.",
+    "Applying the same scenario twice is idempotent and healthy restores the verified baseline.",
+    "Host-compose operations verify the exact Compose project and lab labels before bounded lifecycle or topology changes.",
+    "Neither controller nor runner receives Docker-socket access and no scenario changes files outside the marked lab root.",
+    "Topology scenarios use committed, rendered Compose override files under lab/scenarios rather than dynamically generated or inline YAML."
+  ],
+  "verification": [
+    "python3 -m unittest tests.lab.test_scenarios",
+    "python3 scripts/lab.py test scenarios",
+    "bash scripts/check.sh"
+  ],
+  "claim": {
+    "agent": "hermes",
+    "claimed_at": "2026-08-17T12:50:32+02:00"
+  },
+  "work_status": "completed",
+  "review_status": "review",
+  "review_history": [],
+  "evidence": [
+    {
+      "schema": "go-workflow.finish-evidence.v1",
+      "created_at": "2026-08-17T14:41:37+02:00",
+      "task_id": "lab-05-implement-scenario-controller",
+      "agent": "hermes",
+      "summary": "changed_files=.dockerignore,docs/local-lab.md,lab/Dockerfile.controller,lab/compose.yaml,lab/controller/scenarios.py,lab/scenarios/**,lab/security-matrix.json,schemas/lab-manifest.schema.json,scripts/lab.py,tests/lab/test_compose_contract.py,tests/lab/test_lab_contract.py,tests/lab/test_scenarios.py; verification=105 explicit tests + two docker compose renders + python3 scripts/lab.py test scenarios 9 applies 9 idempotent reapplies 9 healthy restores + bash scripts/check.sh + git diff --check + ./go validate . rc=0; critic=Verdict A exact hash 7ba2d7da8d7ff1a98fbc3e5b498e9975babb2f31e37548b5357c3eb95213c0ba no blockers reviewer modifications none; runtime=hermes-agent; billing_mode=subscription; owner=viggo",
+      "changed_files": [
+        ".dockerignore",
+        "docs/local-lab.md",
+        "lab/Dockerfile.controller",
+        "lab/compose.yaml",
+        "lab/controller/scenarios.py",
+        "lab/scenarios/**",
+        "lab/security-matrix.json",
+        "schemas/lab-manifest.schema.json",
+        "scripts/lab.py",
+        "tests/lab/test_compose_contract.py",
+        "tests/lab/test_lab_contract.py",
+        "tests/lab/test_scenarios.py"
+      ],
+      "no_diff": false,
+      "verification": {
+        "command": "105 explicit tests + two docker compose renders + python3 scripts/lab.py test scenarios 9 applies 9 idempotent reapplies 9 healthy restores + bash scripts/check.sh + git diff --check + ./go validate . rc=0",
+        "result": "105 explicit tests + two docker compose renders + python3 scripts/lab.py test scenarios 9 applies 9 idempotent reapplies 9 healthy restores + bash scripts/check.sh + git diff --check + ./go validate . rc=0"
+      },
+      "runtime": {
+        "agent": "hermes",
+        "runtime": "hermes-agent",
+        "model": null,
+        "billing_mode": "subscription"
+      },
+      "usage": {
+        "schema": "go-workflow.usage-attribution.v1",
+        "runtime_kind": "hermes-agent",
+        "billing_mode": "subscription",
+        "owner": "viggo",
+        "model": null,
+        "token_estimate": null,
+        "api_equivalent_cost_usd": null,
+        "provider_invoice_cost_usd": null,
+        "cost_label": "api_equivalent_not_invoice_cost"
+      },
+      "review": {
+        "outcome": "Verdict A exact hash 7ba2d7da8d7ff1a98fbc3e5b498e9975babb2f31e37548b5357c3eb95213c0ba no blockers reviewer modifications none",
+        "skip_reason": null
+      }
+    }
+  ],
+  "depends_on": [
+    "lab-04-bootstrap-services"
+  ],
+  "priority": 8,
+  "delivery": "lab_foundation",
+  "order": 8
+}

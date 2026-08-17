@@ -37,11 +37,8 @@ services:
         source: "${ARR_LAB_ROOT:-/var/empty/arr-orchestrator-lab}/config/sonarr"
         target: /config
       - type: bind
-        source: "${ARR_LAB_ROOT:-/var/empty/arr-orchestrator-lab}/data/media/tv"
-        target: /data/media/tv
-      - type: bind
-        source: "${ARR_LAB_ROOT:-/var/empty/arr-orchestrator-lab}/data/downloads"
-        target: /data/downloads
+        source: "${ARR_LAB_ROOT:-/var/empty/arr-orchestrator-lab}/data"
+        target: /data
     healthcheck:
       test: [CMD-SHELL, "curl -fsS http://127.0.0.1:8989/ping >/dev/null || exit 1"]
       interval: 5s
@@ -68,11 +65,8 @@ services:
         source: "${ARR_LAB_ROOT:-/var/empty/arr-orchestrator-lab}/config/radarr"
         target: /config
       - type: bind
-        source: "${ARR_LAB_ROOT:-/var/empty/arr-orchestrator-lab}/data/media/movies"
-        target: /data/media/movies
-      - type: bind
-        source: "${ARR_LAB_ROOT:-/var/empty/arr-orchestrator-lab}/data/downloads"
-        target: /data/downloads
+        source: "${ARR_LAB_ROOT:-/var/empty/arr-orchestrator-lab}/data"
+        target: /data
     healthcheck:
       test: [CMD-SHELL, "curl -fsS http://127.0.0.1:7878/ping >/dev/null || exit 1"]
       interval: 5s

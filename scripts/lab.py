@@ -26,6 +26,15 @@ LABEL = "com.viggomeesters.arr-orchestrator.lab=true"
 SECRET_OWNER_IMAGE = "docker.io/library/python:3.13.14-slim-bookworm@sha256:de572b33eae61a53675a87bbd02b5e365df7b6b2b06c9276124e965cec08c452"
 
 
+def ensure_repository_import_path() -> None:
+    root = str(REPO_ROOT)
+    sys.path[:] = [entry for entry in sys.path if entry != root]
+    sys.path.insert(0, root)
+
+
+ensure_repository_import_path()
+
+
 class LabError(RuntimeError):
     def __init__(self, message: str, *, stage: str | None = None):
         super().__init__(message)
@@ -686,6 +695,8 @@ def prepare_bootstrap_runtime(root: Path):
         1001,
     )
     assign_owner(layout.config["qbittorrent"], 911, 1001, recursive=True)
+    data_root = layout.downloads.parent
+    assign_owner(data_root, 911, 1001, directory_mode=0o755)
     assign_owner(layout.downloads, 911, 1001, recursive=True)
     media_root = layout.tv.parent
     assign_owner(media_root, 911, 1001, recursive=True, directory_mode=0o755)
@@ -717,23 +728,282 @@ def controller_bootstrap_command(bundle, mock_path: Path) -> list[str]:
     )
 
 
+def controller_scenario_command(bundle, name: str) -> list[str]:
+    mount_args: list[str] = []
+    for service in ("sonarr", "prowlarr", "qbittorrent"):
+        path = bundle.files[service]
+        mount_args.extend(("--volume", f"{path}:/run/secrets/{service}-credential:ro"))
+    return compose_command(
+        "--profile",
+        "isolation",
+        "run",
+        "--rm",
+        "--build",
+        "--no-deps",
+        *mount_args,
+        "--entrypoint",
+        "python3",
+        "lab-controller",
+        "-m",
+        "lab.controller.scenarios",
+        name,
+    )
+
+
+def scenario_compose_command(override: Path, *args: str) -> list[str]:
+    if override.parent != REPO_ROOT / "lab" / "scenarios" or not override.is_file():
+        raise LabError("scenario Compose override is outside the committed allowlist")
+    return ["docker", "compose", "-f", str(COMPOSE_FILE), "-f", str(override), *args]
+
+
+def scenario_standalone_command(compose_file: Path, *args: str) -> list[str]:
+    if compose_file.parent != REPO_ROOT / "lab" / "scenarios" or not compose_file.is_file():
+        raise LabError("scenario Compose file is outside the committed allowlist")
+    return ["docker", "compose", "-f", str(compose_file), *args]
+
+
+def verify_scenario_project_authority(
+    project: str, lab_id: str, root: Path, service_names: set[str]
+) -> None:
+    from lab.controller.scenarios import verify_host_authority
+
+    reject_symlink_components(root)
+    if root.is_symlink() or root.parent.resolve(strict=True) != runtime_base():
+        raise LabError("host scenario runtime root is outside the trusted parent")
+    marker = root / MARKER
+    marker_stat = marker.lstat()
+    if stat.S_ISLNK(marker_stat.st_mode) or stat.S_IMODE(marker_stat.st_mode) != 0o600:
+        raise LabError("host scenario marker mode is invalid")
+    if marker_stat.st_uid != os.getuid():
+        raise LabError("host scenario marker owner is invalid")
+    marker_value = json.loads(marker.read_text(encoding="utf-8"))
+    if marker_value != {"lab_id": lab_id, "compose_project": project}:
+        raise LabError("host scenario marker identity mismatch")
+
+    observed: dict[str, object] = {"project": project, "lab_id": lab_id, "services": {}}
+    services = observed["services"]
+    assert isinstance(services, dict)
+    container_ids = run(
+        ["docker", "ps", "-aq", "--filter", f"label=com.docker.compose.project={project}"]
+    ).stdout.split()
+    if not container_ids:
+        raise LabError("host scenario project has no containers")
+    inspected = json.loads(run(["docker", "inspect", *container_ids]).stdout)
+    by_service: dict[str, list[dict[str, object]]] = {}
+    for container in inspected:
+        labels = container["Config"]["Labels"]
+        if (
+            labels.get("com.viggomeesters.arr-orchestrator.lab") != "true"
+            or labels.get("com.viggomeesters.arr-orchestrator.lab-id") != lab_id
+            or labels.get("com.docker.compose.project") != project
+        ):
+            raise LabError("host scenario found a foreign project container")
+        by_service.setdefault(labels.get("com.docker.compose.service", ""), []).append(container)
+    for name in sorted(service_names):
+        matches = by_service.get(name, [])
+        if len(matches) != 1:
+            raise LabError("host scenario service identity is ambiguous")
+        labels = matches[0]["Config"]["Labels"]
+        services[name] = {
+            "project": labels.get("com.docker.compose.project"),
+            "lab_id": labels.get("com.viggomeesters.arr-orchestrator.lab-id"),
+        }
+
+    network_ids = run(
+        ["docker", "network", "ls", "-q", "--filter", f"label=com.docker.compose.project={project}"]
+    ).stdout.split()
+    if len(network_ids) != 1:
+        raise LabError("host scenario private network identity is ambiguous")
+    network = json.loads(run(["docker", "network", "inspect", network_ids[0]]).stdout)[0]
+    network_labels = network.get("Labels") or {}
+    if (
+        network.get("Name") != f"{project}_private"
+        or network_labels.get("com.viggomeesters.arr-orchestrator.lab") != "true"
+        or network_labels.get("com.viggomeesters.arr-orchestrator.lab-id") != lab_id
+        or network_labels.get("com.docker.compose.project") != project
+        or network_labels.get("com.docker.compose.network") != "private"
+        or network.get("Internal") is not True
+    ):
+        raise LabError("host scenario private network labels are invalid")
+    verify_host_authority(observed, project, lab_id, service_names)
+
+
+def run_authorized_compose_mutation(
+    project: str,
+    lab_id: str,
+    root: Path,
+    service_names: set[str],
+    command: list[str],
+    env: dict[str, str],
+    *,
+    check: bool = True,
+) -> subprocess.CompletedProcess[str]:
+    verify_scenario_project_authority(project, lab_id, root, service_names)
+    return run(command, env=env, check=check)
+
+
+def scenario_service_containers(project: str, service: str) -> list[str]:
+    return run(
+        [
+            "docker", "ps", "-aq", "--filter", f"label=com.docker.compose.project={project}",
+            "--filter", f"label=com.docker.compose.service={service}",
+        ]
+    ).stdout.split()
+
+
+def scenario_service_container(project: str, service: str) -> str:
+    identifiers = scenario_service_containers(project, service)
+    if len(identifiers) != 1:
+        raise LabError("scenario service container identity is ambiguous")
+    return identifiers[0]
+
+
+def scenario_radarr_config(root: Path) -> Path:
+    path = root / "config" / "radarr-hardlink"
+    reject_symlink_components(path)
+    path.mkdir(mode=0o700, exist_ok=True)
+    if path.is_symlink() or not path.resolve().is_relative_to(root.resolve()):
+        raise LabError("hardlink scenario config escaped the marked runtime root")
+    assign_owner(path, 911, 1001, recursive=True)
+    return path
+
+
+def remove_scenario_radarr_config(root: Path) -> None:
+    path = root / "config" / "radarr-hardlink"
+    reject_symlink_components(path)
+    if not path.exists():
+        return
+    if path.is_symlink() or not path.resolve().is_relative_to(root.resolve()):
+        raise LabError("hardlink scenario config escaped the marked runtime root")
+    assign_owner(path, os.getuid(), os.getgid(), recursive=True)
+    shutil.rmtree(path)
+
+
+def scenario_mount_types(container_id: str) -> dict[str, str]:
+    inspection = json.loads(run(["docker", "inspect", container_id]).stdout)[0]
+    return {
+        mount.get("Destination"): mount.get("Type")
+        for mount in inspection.get("Mounts", [])
+        if mount.get("Destination") in {"/data", "/data/downloads", "/data/media/movies"}
+    }
+
+
+def converge_radarr_hardlink_topology(
+    project: str,
+    lab_id: str,
+    root: Path,
+    env: dict[str, str],
+    *,
+    cross_device: bool,
+) -> str:
+    scenario_file = REPO_ROOT / "lab" / "scenarios" / "hardlink-cross-device.compose.yaml"
+    scenario_ids = scenario_service_containers(project, "radarr-hardlink")
+    if len(scenario_ids) > 1:
+        raise LabError("hardlink scenario service identity is ambiguous")
+    if cross_device:
+        if not scenario_ids:
+            scenario_radarr_config(root)
+            run_authorized_compose_mutation(
+                project,
+                lab_id,
+                root,
+                {"radarr"},
+                scenario_standalone_command(
+                    scenario_file, "--profile", "services", "up", "-d", "--wait", "--no-deps",
+                    "radarr-hardlink",
+                ),
+                env,
+            )
+        container_id = scenario_service_container(project, "radarr-hardlink")
+        verify_scenario_project_authority(project, lab_id, root, {"radarr-hardlink"})
+        verify_hardlink_behavior(container_id, cross_device=True)
+        return container_id
+
+    if scenario_ids:
+        verify_scenario_project_authority(project, lab_id, root, {"radarr-hardlink"})
+        run_authorized_compose_mutation(
+            project,
+            lab_id,
+            root,
+            {"radarr-hardlink"},
+            scenario_standalone_command(
+                scenario_file, "--profile", "services", "rm", "-s", "-f", "radarr-hardlink"
+            ),
+            env,
+        )
+    if scenario_service_containers(project, "radarr-hardlink"):
+        raise LabError("hardlink scenario service survived healthy restore")
+    remove_scenario_radarr_config(root)
+    verify_scenario_project_authority(project, lab_id, root, {"radarr"})
+    container_id = scenario_service_container(project, "radarr")
+    verify_hardlink_behavior(container_id, cross_device=False)
+    return container_id
+
+
+def verify_hardlink_behavior(container_id: str, *, cross_device: bool) -> None:
+    mount_types = scenario_mount_types(container_id)
+    devices = run(
+        [
+            "docker", "exec", "--user", "911:1001", container_id,
+            "stat", "-c", "%d", "/data/downloads", "/data/media/movies",
+        ]
+    ).stdout.split()
+    devices_differ = len(devices) == 2 and devices[0] != devices[1]
+    expected_mounts = (
+        {"/data/downloads": "bind", "/data/media/movies": "tmpfs"}
+        if cross_device
+        else {"/data": "bind"}
+    )
+    if mount_types != expected_mounts or devices_differ != cross_device:
+        raise LabError(
+            "hardlink scenario device topology mismatch: "
+            f"mount_types={json.dumps(mount_types, sort_keys=True)} "
+            f"device_count={len(devices)} devices_differ={str(devices_differ).lower()} "
+            f"expected_cross_device={str(cross_device).lower()}"
+        )
+    probe = run(
+        [
+            "docker", "exec", "--user", "911:1001", container_id, "sh", "-c",
+            "set -eu; s=/data/downloads/.arr-lab-link-source; d=/data/media/movies/.arr-lab-link-target; "
+            "trap 'rm -f \"$s\" \"$d\"' EXIT; rm -f \"$s\" \"$d\"; printf x >\"$s\"; "
+            "if ln \"$s\" \"$d\" 2>/dev/null; then printf linked; else printf blocked; fi",
+        ],
+        check=False,
+    )
+    expected = "blocked" if cross_device else "linked"
+    outcome = probe.stdout.strip()
+    if probe.returncode != 0 or outcome != expected:
+        safe_outcome = outcome if outcome in {"blocked", "linked", ""} else "unexpected"
+        raise LabError(
+            "hardlink operation mismatch: "
+            f"returncode={probe.returncode} outcome={safe_outcome or 'empty'} expected={expected}"
+        )
+
+
+def prowlarr_connectivity_command() -> list[str]:
+    return compose_command(
+        "--profile", "isolation", "run", "--rm", "--build", "--no-deps",
+        "--entrypoint", "python3", "lab-controller", "-c",
+        "import urllib.request; urllib.request.urlopen('http://prowlarr:9696/ping',timeout=3).read()",
+    )
+
+
 def verify_real_service_inspection(project: str, services: dict[str, str]) -> dict[str, object]:
     expected_real = {"sonarr", "radarr", "prowlarr", "qbittorrent", "jellyfin"}
     if set(services) != expected_real | {"mock-indexer"}:
         raise LabError("bootstrap started an unexpected service set")
+    matrix = json.loads((REPO_ROOT / "lab" / "security-matrix.json").read_text(encoding="utf-8"))
+    matrix_services = {item["service"]: item for item in matrix["services"]}
     expected_writable = {
-        "sonarr": {"/config", "/data/media/tv", "/data/downloads"},
-        "radarr": {"/config", "/data/media/movies", "/data/downloads"},
-        "prowlarr": {"/config"},
-        "qbittorrent": {"/config", "/data/downloads"},
-        "jellyfin": {"/config", "/cache"},
+        service: {mount["target"] for mount in matrix_services[service]["writable_mounts"]}
+        for service in expected_real
     }
-    expected_process = {
-        "sonarr": (911, "Sonarr"),
-        "radarr": (911, "Radarr"),
-        "prowlarr": (911, "Prowlarr"),
-        "qbittorrent": (911, "qbittorrent-nox"),
-        "jellyfin": (65532, "jellyfin"),
+    process_name = {
+        "sonarr": "Sonarr",
+        "radarr": "Radarr",
+        "prowlarr": "Prowlarr",
+        "qbittorrent": "qbittorrent-nox",
+        "jellyfin": "jellyfin",
     }
     for service in sorted(expected_real):
         container_id = services[service]
@@ -756,12 +1026,13 @@ def verify_real_service_inspection(project: str, services: dict[str, str]) -> di
         health = container.get("State", {}).get("Health", {}).get("Status")
         if health != "healthy":
             raise LabError(f"{service} is not healthy")
-        expected_uid, process_name = expected_process[service]
+        expected_uid = matrix_services[service]["long_running_uid"]
+        expected_name = process_name[service]
         process_rows = run(["docker", "top", container_id, "-eo", "pid,uid,gid,args"]).stdout.splitlines()[1:]
         if not any(
             len(row.split(None, 3)) == 4
             and row.split(None, 3)[1] == str(expected_uid)
-            and process_name in row
+            and expected_name in row
             for row in process_rows
         ):
             raise LabError(f"{service} long-running UID does not match the security matrix")
@@ -894,6 +1165,151 @@ def test_bootstrap() -> int:
     return emit(result)
 
 
+def test_scenarios() -> int:
+    from lab.controller.scenarios import apply_runner_config, load_registry
+
+    lab_id, project, root = create_runtime()
+    env = lab_env(lab_id, project, root)
+    completed = False
+    controller_runs: list[subprocess.CompletedProcess[str]] = []
+    result: dict[str, object]
+    try:
+        _layout, bundle, mock_path, mock_value = prepare_bootstrap_runtime(root)
+        run(
+            compose_command(
+                "--profile", "services", "--profile", "doubles", "up", "-d", "--build", "--wait",
+                "sonarr", "radarr", "prowlarr", "qbittorrent", "jellyfin", "mock-indexer",
+            ),
+            env=env,
+        )
+        baseline_run = run(controller_bootstrap_command(bundle, mock_path), env=env, check=False)
+        controller_runs.append(baseline_run)
+        baseline = last_json_object(baseline_run.stdout)
+        if baseline_run.returncode != 0 or baseline.get("ok") is not True:
+            raise LabError("scenario baseline bootstrap failed")
+
+        api_results: dict[str, object] = {}
+        for name in (
+            "category-mismatch", "root-folder-mismatch", "application-sync-mismatch", "path-mapping-mismatch"
+        ):
+            command = controller_scenario_command(bundle, name)
+            first_run = run(command, env=env, check=False)
+            second_run = run(command, env=env, check=False)
+            controller_runs.extend((first_run, second_run))
+            if first_run.returncode != 0 or second_run.returncode != 0:
+                raise LabError(f"controller scenario failed: {name}")
+            first = last_json_object(first_run.stdout)
+            second = last_json_object(second_run.stdout)
+            if first != second or first.get("scenario") != name or first.get("ok") is not True:
+                raise LabError(f"controller scenario is not idempotent: {name}")
+            healthy_run = run(controller_scenario_command(bundle, "healthy"), env=env, check=False)
+            controller_runs.append(healthy_run)
+            if healthy_run.returncode != 0 or last_json_object(healthy_run.stdout).get("scenario") != "healthy":
+                raise LabError(f"controller scenario healthy restore failed: {name}")
+            verify_run = run(controller_bootstrap_command(bundle, mock_path), env=env, check=False)
+            controller_runs.append(verify_run)
+            if verify_run.returncode != 0 or last_json_object(verify_run.stdout) != baseline:
+                raise LabError(f"controller scenario baseline drift after restore: {name}")
+            api_results[name] = first
+
+        runner_results: dict[str, str] = {}
+        for name in ("unsupported-api-version", "stale-plan", "destructive-denial"):
+            first_path = apply_runner_config(root, name)
+            first_bytes = first_path.read_bytes()
+            second_path = apply_runner_config(root, name)
+            if first_path != second_path or first_bytes != second_path.read_bytes():
+                raise LabError(f"runner scenario is not idempotent: {name}")
+            runner_results[name] = "idempotent"
+            apply_runner_config(root, "healthy")
+            if first_path.exists():
+                raise LabError(f"runner scenario healthy restore failed: {name}")
+
+        hardlink_container = converge_radarr_hardlink_topology(
+            project, lab_id, root, env, cross_device=True
+        )
+        if converge_radarr_hardlink_topology(
+            project, lab_id, root, env, cross_device=True
+        ) != hardlink_container:
+            raise LabError("second hardlink scenario apply recreated Radarr")
+        healthy_radarr = converge_radarr_hardlink_topology(
+            project, lab_id, root, env, cross_device=False
+        )
+        if converge_radarr_hardlink_topology(
+            project, lab_id, root, env, cross_device=False
+        ) != healthy_radarr:
+            raise LabError("second hardlink healthy restore recreated Radarr")
+        hardlink_restored = run(controller_bootstrap_command(bundle, mock_path), env=env, check=False)
+        controller_runs.append(hardlink_restored)
+        if hardlink_restored.returncode != 0 or last_json_object(hardlink_restored.stdout) != baseline:
+            raise LabError("hardlink healthy restore drifted from baseline")
+
+        unavailable_override = REPO_ROOT / "lab" / "scenarios" / "service-unavailable.compose.yaml"
+        unavailable_prefix = scenario_compose_command(unavailable_override, "--profile", "services")
+        run_authorized_compose_mutation(
+            project, lab_id, root, {"prowlarr"},
+            [*unavailable_prefix, "up", "-d", "--no-deps", "prowlarr"], env,
+        )
+        run_authorized_compose_mutation(
+            project, lab_id, root, {"prowlarr"}, [*unavailable_prefix, "stop", "prowlarr"], env,
+        )
+        run_authorized_compose_mutation(
+            project, lab_id, root, {"prowlarr"}, [*unavailable_prefix, "stop", "prowlarr"], env,
+        )
+        container_id = scenario_service_container(project, "prowlarr")
+        if json.loads(run(["docker", "inspect", container_id]).stdout)[0]["State"]["Running"]:
+            raise LabError("service unavailable scenario did not stop the exact service")
+        unreachable = run_authorized_compose_mutation(
+            project, lab_id, root, {"prowlarr"}, prowlarr_connectivity_command(), env, check=False,
+        )
+        if unreachable.returncode == 0:
+            raise LabError("service unavailable scenario remained internally reachable")
+        run_authorized_compose_mutation(
+            project, lab_id, root, {"prowlarr"},
+            compose_command("--profile", "services", "up", "-d", "--wait", "--no-deps", "prowlarr"), env,
+        )
+        reachable = run_authorized_compose_mutation(
+            project, lab_id, root, {"prowlarr"}, prowlarr_connectivity_command(), env,
+        )
+        if reachable.returncode != 0:
+            raise LabError("service unavailable healthy restore remained unreachable")
+        restored = run(controller_bootstrap_command(bundle, mock_path), env=env, check=False)
+        controller_runs.append(restored)
+        if restored.returncode != 0 or last_json_object(restored.stdout) != baseline:
+            raise LabError("service unavailable healthy restore drifted from baseline")
+
+        declared = {item["name"] for item in load_registry()}
+        expected = {
+            "healthy", "category-mismatch", "root-folder-mismatch", "application-sync-mismatch",
+            "path-mapping-mismatch", "hardlink-cross-device", "service-unavailable",
+            "unsupported-api-version", "stale-plan", "destructive-denial",
+        }
+        if declared != expected:
+            raise LabError("live scenario registry drifted from the canonical allowlist")
+        assert_no_secret_exposure(project, controller_runs, credential_variants(bundle, mock_value), env)
+        result = {
+            "schema": "arr-orchestrator.lab-scenario-run.v1",
+            "lab_id": lab_id,
+            "ok": True,
+            "scenarios": sorted(declared - {"healthy"}),
+            "controller_api": sorted(api_results),
+            "runner_config": runner_results,
+            "host_compose": {"hardlink_cross_device": True, "service_unavailable": "restored"},
+            "healthy_restores": 9,
+            "idempotent_applies": 9,
+        }
+        completed = True
+    finally:
+        down = run(compose_down_command("services", "doubles", "isolation", "runner"), env=env, check=False)
+        remaining_containers = run(["docker", "ps", "-aq", "--filter", f"label=com.docker.compose.project={project}"]).stdout.split()
+        remaining_networks = run(["docker", "network", "ls", "-q", "--filter", f"label=com.docker.compose.project={project}"]).stdout.split()
+        remaining_images = remaining_project_images(project)
+        if down.returncode != 0 or remaining_containers or remaining_networks or remaining_images:
+            finalize_runtime(root, lab_id, project, success=False)
+            raise LabError("bounded scenario cleanup did not converge")
+        finalize_runtime(root, lab_id, project, success=completed)
+    return emit(result)
+
+
 def render() -> int:
     lab_id = "lab-render"
     project = f"arr-orchestrator-{lab_id}"
@@ -919,12 +1335,67 @@ def render() -> int:
     return 0
 
 
+def render_scenario_override(name: str, runtime_root: Path) -> dict[str, object]:
+    from lab.controller.scenarios import scenario_by_name
+
+    item = scenario_by_name(name)
+    if item["driver"] != "host-compose":
+        raise LabError("scenario does not use host-compose authority")
+    override = REPO_ROOT / item["action"]["override"]
+    if not override.is_file() or override.parent != REPO_ROOT / "lab" / "scenarios":
+        raise LabError("scenario Compose override is outside the committed allowlist")
+    lab_id = "lab-scenario-contract"
+    project = f"arr-orchestrator-{lab_id}"
+    env = lab_env(lab_id, project, runtime_root)
+    command_builder = (
+        scenario_standalone_command if name == "hardlink-cross-device" else scenario_compose_command
+    )
+    rendered = json.loads(
+        run(
+            command_builder(
+                override, "--profile", "services", "--profile", "runner",
+                "config", "--format", "json",
+            ),
+            env=env,
+        ).stdout
+    )
+    services = rendered.get("services", {})
+    encoded = json.dumps(services, sort_keys=True)
+    published_ports = sum(
+        len(service.get("ports") or []) for service in services.values() if isinstance(service, dict)
+    )
+    private = rendered.get("networks", {}).get("private", {})
+    mount_types = {
+        service_name: {
+            mount.get("target"): mount.get("type")
+            for mount in service.get("volumes", [])
+            if isinstance(mount, dict) and isinstance(mount.get("target"), str)
+        }
+        for service_name, service in services.items()
+        if isinstance(service, dict)
+    }
+    scenario_services = sorted(
+        service_name
+        for service_name, service in services.items()
+        if isinstance(service, dict)
+        and (service.get("labels") or {}).get("com.viggomeesters.arr-orchestrator.scenario") == name
+    )
+    return {
+        "scenario": name,
+        "published_ports": published_ports,
+        "internal_network": private.get("internal") is True,
+        "docker_socket": "docker.sock" in encoded,
+        "mount_types": mount_types,
+        "scenario_services": scenario_services,
+    }
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="lab.py")
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("render")
     test_parser = subparsers.add_parser("test")
-    test_parser.add_argument("suite", choices=("isolation", "doubles", "bootstrap"))
+    test_parser.add_argument("suite", choices=("isolation", "doubles", "bootstrap", "scenarios"))
     subparsers.add_parser("container-health-server")
     subparsers.add_parser("container-idle")
     return parser
@@ -940,6 +1411,8 @@ def main(argv: list[str] | None = None) -> int:
                 return test_doubles()
             if args.suite == "bootstrap":
                 return test_bootstrap()
+            if args.suite == "scenarios":
+                return test_scenarios()
             return test_isolation()
         if args.command == "container-health-server":
             return container_health_server()

@@ -73,6 +73,8 @@ Every container drops all capabilities and enables `no_new_privileges`. A non-ro
 
 The matrix cannot grant Docker-socket access. Writable targets and tmpfs targets are enumerated; runtime inspection must prove the actual mounts, effective UID, capabilities, seccomp mode, PID limit, memory limit, and CPU limit match the matrix.
 
+Sonarr and Radarr receive one repository-owned `${ARR_LAB_ROOT}/data` bind at `/data`. Downloads and media therefore share one Linux mount boundary, so the certified healthy topology can create real hardlinks. Mounting the same host filesystem separately at `/data/downloads` and `/data/media/...` is not equivalent: `st_dev` may match while `link(2)` still returns `EXDEV` across the distinct bind mounts. The `hardlink-cross-device` scenario uses a committed, separately labelled Radarr scenario service whose media target is tmpfs; readback must prove both the different device IDs and the failed hardlink before healthy removes that exact service and re-proves a successful hardlink in baseline Radarr.
+
 ## Reset
 
 Reset is a security protocol, not a convenience command. It requires:

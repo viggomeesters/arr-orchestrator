@@ -147,11 +147,15 @@
       "items": {
         "enum": [
           "healthy",
+          "category-mismatch",
+          "root-folder-mismatch",
+          "application-sync-mismatch",
+          "path-mapping-mismatch",
+          "hardlink-cross-device",
           "service-unavailable",
-          "malformed-json",
           "unsupported-api-version",
-          "stale-readback",
-          "hardlink-cross-device"
+          "stale-plan",
+          "destructive-denial"
         ]
       }
     }

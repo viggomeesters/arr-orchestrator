@@ -15,6 +15,9 @@ lab/*
 !lab/host/**
 !lab/controller/
 !lab/controller/**
+!lab/scenarios/
+lab/scenarios/*
+!lab/scenarios/registry.json
 lab/**/__pycache__/
 lab/**/__pycache__/**
 lab/**/*.py[cod]

@@ -211,6 +211,62 @@ services:
       retries: 15
       start_period: 2s
 
+  mock-indexer:
+    <<: *common-security
+    build:
+      context: services/mock-indexer
+      dockerfile: Dockerfile
+    platform: linux/amd64
+    profiles: [doubles]
+    labels: *lab-labels
+    user: "65532:65532"
+    environment:
+      TOKEN_FILE: /run/secrets/mock-indexer-token
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 1.0
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=32m
+    volumes:
+      - type: bind
+        source: "${ARR_LAB_ROOT:-/var/empty/arr-orchestrator-lab}/secrets/mock-indexer-token"
+        target: /run/secrets/mock-indexer-token
+        read_only: true
+    healthcheck:
+      test: [CMD, python3, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health/live', timeout=1).read()"]
+      interval: 2s
+      timeout: 1s
+      retries: 30
+      start_period: 2s
+
+  fault-api:
+    <<: *common-security
+    build:
+      context: services/fault-api
+      dockerfile: Dockerfile
+    platform: linux/amd64
+    profiles: [doubles]
+    labels: *lab-labels
+    user: "65532:65532"
+    environment:
+      TOKEN_FILE: /run/secrets/fault-api-token
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 1.0
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=32m
+    volumes:
+      - type: bind
+        source: "${ARR_LAB_ROOT:-/var/empty/arr-orchestrator-lab}/secrets/fault-api-token"
+        target: /run/secrets/fault-api-token
+        read_only: true
+    healthcheck:
+      test: [CMD, python3, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health/live', timeout=1).read()"]
+      interval: 2s
+      timeout: 1s
+      retries: 30
+      start_period: 2s
+
 networks:
   private:
     name: "${COMPOSE_PROJECT_NAME}_private"

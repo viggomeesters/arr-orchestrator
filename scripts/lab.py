@@ -9,6 +9,7 @@ import os
 import secrets
 import shutil
 import socket
+import stat
 import subprocess
 import sys
 import threading
@@ -20,6 +21,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 COMPOSE_FILE = REPO_ROOT / "lab" / "compose.yaml"
 MARKER = ".arr-orchestrator-lab"
 LABEL = "com.viggomeesters.arr-orchestrator.lab=true"
+SECRET_OWNER_IMAGE = "docker.io/library/python:3.13.14-slim-bookworm@sha256:de572b33eae61a53675a87bbd02b5e365df7b6b2b06c9276124e965cec08c452"
 
 
 class LabError(RuntimeError):
@@ -122,6 +124,27 @@ def finalize_runtime(root: Path, lab_id: str, project: str, *, success: bool) ->
 
 def compose_command(*args: str) -> list[str]:
     return ["docker", "compose", "-f", str(COMPOSE_FILE), *args]
+
+
+def compose_down_command(profile: str) -> list[str]:
+    return compose_command(
+        "--profile",
+        profile,
+        "down",
+        "--remove-orphans",
+        "--volumes",
+        "--rmi",
+        "local",
+    )
+
+
+def remaining_project_images(project: str) -> list[str]:
+    return [
+        repository
+        for repository in run(["docker", "image", "ls", "--format", "{{.Repository}}"])
+        .stdout.splitlines()
+        if repository.startswith(f"{project}-")
+    ]
 
 
 def lab_env(lab_id: str, project: str, root: Path) -> dict[str, str]:
@@ -326,7 +349,7 @@ def test_isolation() -> int:
         server_socket.close()
         thread.join(timeout=1)
         down = run(
-            compose_command("--profile", "isolation", "down", "--remove-orphans", "--volumes"),
+            compose_down_command("isolation"),
             env=env,
             check=False,
         )
@@ -336,9 +359,257 @@ def test_isolation() -> int:
         remaining_networks = run(
             ["docker", "network", "ls", "-q", "--filter", f"label=com.docker.compose.project={project}"]
         ).stdout.split()
-        if down.returncode != 0 or remaining_containers or remaining_networks:
+        remaining_images = remaining_project_images(project)
+        if down.returncode != 0 or remaining_containers or remaining_networks or remaining_images:
             finalize_runtime(root, lab_id, project, success=False)
             raise LabError("bounded project cleanup did not converge")
+        finalize_runtime(root, lab_id, project, success=completed)
+    return emit(result)
+
+
+def write_secret(root: Path, name: str) -> Path:
+    secret_root = root / "secrets"
+    secret_root.mkdir(mode=0o700, exist_ok=True)
+    os.chmod(secret_root, 0o700)
+    secret_file = secret_root / name
+    secret_file.write_text(secrets.token_urlsafe(32) + "\n", encoding="utf-8")
+    os.chmod(secret_file, 0o600)
+    run(
+        [
+            "docker",
+            "run",
+            "--rm",
+            "--network",
+            "none",
+            "--read-only",
+            "--cap-drop",
+            "ALL",
+            "--cap-add",
+            "CHOWN",
+            "--cap-add",
+            "DAC_OVERRIDE",
+            "--cap-add",
+            "FOWNER",
+            "--security-opt",
+            "no-new-privileges:true",
+            "--user",
+            "0:0",
+            "--mount",
+            f"type=bind,source={secret_root},target=/secrets",
+            "--entrypoint",
+            "python3",
+            SECRET_OWNER_IMAGE,
+            "-c",
+            "import os,sys; os.chown('/secrets/'+sys.argv[1],65532,65532); os.chmod('/secrets/'+sys.argv[1],0o600)",
+            name,
+        ]
+    )
+    info = secret_file.stat()
+    if (info.st_uid, info.st_gid, stat.S_IMODE(info.st_mode)) != (65532, 65532, 0o600):
+        raise LabError("secret ownership or mode is invalid")
+    return secret_file
+
+
+def verify_double_container(project: str, container_id: str, expected_secret: str) -> None:
+    container = json.loads(run(["docker", "inspect", container_id]).stdout)[0]
+    host_config = container["HostConfig"]
+    if host_config.get("Privileged") or "ALL" not in (host_config.get("CapDrop") or []):
+        raise LabError("double container security capabilities are invalid")
+    if "no-new-privileges:true" not in (host_config.get("SecurityOpt") or []):
+        raise LabError("double container lacks no-new-privileges")
+    if not host_config.get("ReadonlyRootfs") or container["Config"].get("User") != "65532:65532":
+        raise LabError("double container identity or root filesystem is unbounded")
+    ports = container["NetworkSettings"].get("Ports") or {}
+    if any(value for value in ports.values()):
+        raise LabError("double container published a host port")
+    if set(container["NetworkSettings"]["Networks"]) != {f"{project}_private"}:
+        raise LabError("double container is attached to an unexpected network")
+    mounts = container.get("Mounts", [])
+    if any("docker.sock" in json.dumps(mount) for mount in mounts):
+        raise LabError("double container received Docker authority")
+    secret_mounts = [mount for mount in mounts if mount.get("Destination") == f"/run/secrets/{expected_secret}"]
+    if len(secret_mounts) != 1 or secret_mounts[0].get("RW"):
+        raise LabError("double secret mount is absent or writable")
+
+
+def test_doubles() -> int:
+    lab_id, project, root = create_runtime()
+    env = lab_env(lab_id, project, root)
+    completed = False
+    result: dict[str, object]
+    try:
+        write_secret(root, "mock-indexer-token")
+        write_secret(root, "fault-api-token")
+        run(
+            compose_command(
+                "--profile",
+                "doubles",
+                "up",
+                "-d",
+                "--build",
+                "--wait",
+                "mock-indexer",
+                "fault-api",
+            ),
+            env=env,
+        )
+        service_rows = run(
+            [
+                "docker",
+                "ps",
+                "--filter",
+                f"label=com.docker.compose.project={project}",
+                "--format",
+                "{{.Label \"com.docker.compose.service\"}}={{.ID}}",
+            ]
+        ).stdout.splitlines()
+        services = dict(row.split("=", 1) for row in service_rows if "=" in row)
+        if set(services) != {"mock-indexer", "fault-api"}:
+            raise LabError("the doubles probe started an unexpected service set")
+        verify_double_container(project, services["mock-indexer"], "mock-indexer-token")
+        verify_double_container(project, services["fault-api"], "fault-api-token")
+
+        mock_probe = r'''
+import json, urllib.error, urllib.request
+credential_value = open('/run/secrets/mock-indexer-token', encoding='utf-8').read().strip()
+
+def request(url, authorization=None, extra_headers=None):
+    headers = dict(extra_headers or {})
+    if authorization:
+        headers['Authorization'] = f'Bearer {authorization}'
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=1) as response:
+            return response.status, response.read().decode()
+    except urllib.error.HTTPError as error:
+        return error.code, error.read().decode()
+
+unauthorized = request('http://127.0.0.1:8080/api/v1/search')
+authorized = request('http://127.0.0.1:8080/api/v1/search', credential_value)
+cross = request('http://fault-api:8080/health/live')
+request('http://127.0.0.1:8080/health/live?trace=redaction-canary', extra_headers={'Cookie': 'session=redaction-canary'})
+print(json.dumps({'authorized': authorized, 'cross_fault_health': cross, 'unauthorized': unauthorized}, sort_keys=True))
+'''
+        mock_result = json.loads(
+            run(["docker", "exec", services["mock-indexer"], "python3", "-c", mock_probe]).stdout
+        )
+
+        fault_probe = r'''
+import json, os, socket, urllib.error, urllib.request
+credential_value = open('/run/secrets/fault-api-token', encoding='utf-8').read().strip()
+
+def request(method, url, payload=None, timeout=1, authorize=True, extra_headers=None):
+    body = json.dumps(payload, separators=(',', ':')).encode() if payload is not None else None
+    headers = dict(extra_headers or {})
+    if authorize and method in {'PUT', 'POST'}:
+        headers['Authorization'] = f'Bearer {credential_value}'
+    if body is not None:
+        headers['Content-Type'] = 'application/json'
+    req = urllib.request.Request(url, data=body, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            return response.status, response.read().decode()
+    except urllib.error.HTTPError as error:
+        return error.code, error.read().decode()
+
+def scenario(name):
+    status, body = request('PUT', 'http://127.0.0.1:8080/scenario', {'scenario': name})
+    if status != 200:
+        raise SystemExit('scenario control failed')
+    return request('GET', 'http://127.0.0.1:8080/api/v1/probe')
+
+unauthorized_control = request('PUT', 'http://127.0.0.1:8080/scenario', {'scenario': 'unavailable'}, authorize=False)
+results = {name: scenario(name) for name in ('unavailable', 'malformed-json', 'unsupported-version', 'stale-readback')}
+request('PUT', 'http://127.0.0.1:8080/scenario', {'scenario': 'timeout'})
+try:
+    request('GET', 'http://127.0.0.1:8080/api/v1/probe', timeout=0.25)
+except (TimeoutError, socket.timeout, urllib.error.URLError):
+    results['timeout'] = 'client_timeout'
+else:
+    raise SystemExit('timeout scenario returned before the client deadline')
+reset = request('POST', 'http://127.0.0.1:8080/reset')
+healthy = request('GET', 'http://127.0.0.1:8080/api/v1/probe')
+cross = request('GET', 'http://mock-indexer:8080/health/live')
+request('GET', 'http://127.0.0.1:8080/health/live?trace=redaction-canary', extra_headers={'Cookie': 'session=redaction-canary'})
+route_lines = open('/proc/net/route', encoding='utf-8').read().splitlines()[1:]
+default_route_absent = not any(line.split()[1] == '00000000' for line in route_lines)
+docker_socket_absent = not (os.path.exists('/var/run/docker.sock') or os.path.exists('/run/docker.sock'))
+try:
+    socket.create_connection(('1.1.1.1', 443), timeout=0.5)
+except OSError:
+    internet_blocked = True
+else:
+    internet_blocked = False
+print(json.dumps({
+    'cross_mock_health': cross,
+    'default_route_absent': default_route_absent,
+    'docker_socket_absent': docker_socket_absent,
+    'healthy_after_reset': healthy,
+    'internet_blocked': internet_blocked,
+    'reset': reset,
+    'scenarios': results,
+    'unauthorized_control': unauthorized_control,
+}, sort_keys=True))
+'''
+        fault_result = json.loads(
+            run(["docker", "exec", services["fault-api"], "python3", "-c", fault_probe]).stdout
+        )
+
+        expected_mock = {
+            "authorized": [200, '{"items":[{"id":"synthetic-1","title":"Synthetic Result"}],"total":1}'],
+            "cross_fault_health": [200, '{"status":"live"}'],
+            "unauthorized": [401, '{"error":"unauthorized"}'],
+        }
+        expected_scenarios = {
+            "malformed-json": [200, '{"broken":'],
+            "stale-readback": [200, '{"generation":1,"observed_generation":0,"status":"stale"}'],
+            "timeout": "client_timeout",
+            "unavailable": [503, '{"error":"service_unavailable"}'],
+            "unsupported-version": [200, '{"api_version":"999","status":"unsupported"}'],
+        }
+        if mock_result != expected_mock or fault_result.get("scenarios") != expected_scenarios:
+            raise LabError("double responses do not match the deterministic contract")
+        if fault_result.get("healthy_after_reset") != [200, '{"api_version":"1","generation":1,"status":"ok"}']:
+            raise LabError("fault API reset did not restore the healthy response")
+        if fault_result.get("reset") != [200, '{"scenario":"healthy"}']:
+            raise LabError("fault API reset acknowledgement is invalid")
+        if fault_result.get("unauthorized_control") != [401, '{"error":"unauthorized"}']:
+            raise LabError("fault API accepted unauthorized scenario control")
+        if fault_result.get("cross_mock_health") != [200, '{"status":"live"}']:
+            raise LabError("private cross-container communication failed")
+        for check in ("default_route_absent", "docker_socket_absent", "internet_blocked"):
+            if fault_result.get(check) is not True:
+                raise LabError(f"double isolation check failed: {check}")
+        for container_id in services.values():
+            logs = run(["docker", "logs", container_id], check=False)
+            if "redaction-canary" in logs.stdout or "redaction-canary" in logs.stderr:
+                raise LabError("double logs exposed request material")
+        result = {
+            "schema": "arr-orchestrator.lab-doubles-result.v1",
+            "lab_id": lab_id,
+            "ok": True,
+            "services": sorted(services),
+            "scenarios": sorted(expected_scenarios),
+            "synthetic_credentials": 2,
+            "real_services_started": 0,
+            "published_ports": 0,
+        }
+        completed = True
+    finally:
+        down = run(
+            compose_down_command("doubles"),
+            env=env,
+            check=False,
+        )
+        remaining_containers = run(
+            ["docker", "ps", "-aq", "--filter", f"label=com.docker.compose.project={project}"]
+        ).stdout.split()
+        remaining_networks = run(
+            ["docker", "network", "ls", "-q", "--filter", f"label=com.docker.compose.project={project}"]
+        ).stdout.split()
+        remaining_images = remaining_project_images(project)
+        if down.returncode != 0 or remaining_containers or remaining_networks or remaining_images:
+            finalize_runtime(root, lab_id, project, success=False)
+            raise LabError("bounded doubles cleanup did not converge")
         finalize_runtime(root, lab_id, project, success=completed)
     return emit(result)
 
@@ -356,6 +627,8 @@ def render() -> int:
             "isolation",
             "--profile",
             "runner",
+            "--profile",
+            "doubles",
             "config",
             "--format",
             "json",
@@ -371,7 +644,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("render")
     test_parser = subparsers.add_parser("test")
-    test_parser.add_argument("suite", choices=("isolation",))
+    test_parser.add_argument("suite", choices=("isolation", "doubles"))
     subparsers.add_parser("container-health-server")
     subparsers.add_parser("container-idle")
     return parser
@@ -384,6 +657,8 @@ def main(argv: list[str] | None = None) -> int:
             return render()
         if args.command == "test" and args.suite == "isolation":
             return test_isolation()
+        if args.command == "test" and args.suite == "doubles":
+            return test_doubles()
         if args.command == "container-health-server":
             return container_health_server()
         if args.command == "container-idle":

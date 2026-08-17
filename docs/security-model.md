@@ -39,3 +39,13 @@ the canonical task and JSONL evidence remain sufficient for repository audit.
 ## Out of scope at foundation release
 
 The repository does not yet connect to a live stack or perform remote mutations. Those capabilities require their own claimed Go tasks, tests, security review, and evidence.
+
+## Disposable local lab boundary
+
+The synthetic lab is the mandatory promotion environment for service integrations and mutation logic. It uses real service containers with repository-owned dependency doubles, but no live credentials, private media, private endpoint identifiers, or production configuration.
+
+The application network is project-scoped, internal, isolated at the bridge gateway, and publishes no host ports. Containers receive no Docker socket. Docker/Compose authority remains on the WSL host; authenticated service probes execute inside the isolated network and read credentials from runtime-mounted files.
+
+Runtime state resolves beneath `${XDG_DATA_HOME:-~/.local/share}/arr-orchestrator/lab/<lab-id>` on the native Linux filesystem. The controller must reject checkout paths, `/mnt` paths, symlink traversal, ownership mismatches, and ambiguous reset targets. Reset is limited to marker- and label-matched resources; global Docker cleanup is forbidden.
+
+The four readiness states remain distinct: process liveness, unauthenticated API liveness, authenticated API readiness, and verified synthetic baseline. A running container is not proof of a healthy lab.

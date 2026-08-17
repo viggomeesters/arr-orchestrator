@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.viggomeesters.com/arr-orchestrator/lab-manifest.schema.json",
+  "title": "Arr Orchestrator disposable lab manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "artifact_kind",
+    "lab_id",
+    "compose_project",
+    "runtime",
+    "network",
+    "services",
+    "reset",
+    "scenarios"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "1.0.0"
+    },
+    "artifact_kind": {
+      "const": "lab_manifest"
+    },
+    "lab_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{2,31}$"
+    },
+    "compose_project": {
+      "type": "string",
+      "pattern": "^arr-orchestrator-[a-z][a-z0-9-]{2,31}$"
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "root_ref": {
+          "type": "string",
+          "pattern": "^xdg-data:arr-orchestrator/lab/[a-z][a-z0-9-]{2,31}$"
+        },
+        "marker_file": {
+          "const": ".arr-orchestrator-lab"
+        },
+        "root_mode": {
+          "const": "0700"
+        },
+        "secret_directory_mode": {
+          "const": "0700"
+        },
+        "allowed_secret_file_modes": {
+          "const": [
+            "0400",
+            "0600"
+          ]
+        }
+      },
+      "required": [
+        "root_ref",
+        "marker_file",
+        "root_mode",
+        "secret_directory_mode",
+        "allowed_secret_file_modes"
+      ]
+    },
+    "network": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name_template": {
+          "const": "${COMPOSE_PROJECT_NAME}_private"
+        },
+        "internal": {
+          "const": true
+        },
+        "gateway_mode_ipv4": {
+          "const": "isolated"
+        },
+        "application_network_count": {
+          "const": 1
+        },
+        "published_ports": {
+          "type": "array",
+          "maxItems": 0
+        }
+      },
+      "required": [
+        "name_template",
+        "internal",
+        "gateway_mode_ipv4",
+        "application_network_count",
+        "published_ports"
+      ]
+    },
+    "services": {
+      "const": [
+        "sonarr",
+        "radarr",
+        "prowlarr",
+        "qbittorrent",
+        "jellyfin",
+        "lab-controller",
+        "arrctl-runner",
+        "mock-indexer",
+        "fault-api"
+      ]
+    },
+    "reset": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "direct_child_only": {
+          "const": true
+        },
+        "marker_required": {
+          "const": true
+        },
+        "lab_id_must_match": {
+          "const": true
+        },
+        "compose_project_must_match": {
+          "const": true
+        },
+        "resource_label": {
+          "const": "com.viggomeesters.arr-orchestrator.lab=true"
+        },
+        "no_follow": {
+          "const": true
+        },
+        "global_prune_allowed": {
+          "const": false
+        }
+      },
+      "required": [
+        "direct_child_only",
+        "marker_required",
+        "lab_id_must_match",
+        "compose_project_must_match",
+        "resource_label",
+        "no_follow",
+        "global_prune_allowed"
+      ]
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "healthy",
+          "service-unavailable",
+          "malformed-json",
+          "unsupported-api-version",
+          "stale-readback",
+          "hardlink-cross-device"
+        ]
+      }
+    }
+  }
+}

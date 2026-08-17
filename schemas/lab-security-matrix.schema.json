@@ -1,0 +1,345 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.viggomeesters.com/arr-orchestrator/lab-security-matrix.schema.json",
+  "title": "Arr Orchestrator lab container security matrix",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "artifact_kind",
+    "platform",
+    "services"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "1.0.0"
+    },
+    "artifact_kind": {
+      "const": "lab_security_matrix"
+    },
+    "platform": {
+      "const": "linux/amd64"
+    },
+    "services": {
+      "type": "array",
+      "minItems": 9,
+      "maxItems": 9,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/service"
+      },
+      "allOf": [
+        {
+          "contains": {
+            "type": "object",
+            "required": [
+              "service"
+            ],
+            "properties": {
+              "service": {
+                "const": "sonarr"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "required": [
+              "service"
+            ],
+            "properties": {
+              "service": {
+                "const": "radarr"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "required": [
+              "service"
+            ],
+            "properties": {
+              "service": {
+                "const": "prowlarr"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "required": [
+              "service"
+            ],
+            "properties": {
+              "service": {
+                "const": "qbittorrent"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "required": [
+              "service"
+            ],
+            "properties": {
+              "service": {
+                "const": "jellyfin"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "required": [
+              "service"
+            ],
+            "properties": {
+              "service": {
+                "const": "lab-controller"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "required": [
+              "service"
+            ],
+            "properties": {
+              "service": {
+                "const": "arrctl-runner"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "required": [
+              "service"
+            ],
+            "properties": {
+              "service": {
+                "const": "mock-indexer"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "required": [
+              "service"
+            ],
+            "properties": {
+              "service": {
+                "const": "fault-api"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "service": {
+          "enum": [
+            "sonarr",
+            "radarr",
+            "prowlarr",
+            "qbittorrent",
+            "jellyfin",
+            "lab-controller",
+            "arrctl-runner",
+            "mock-indexer",
+            "fault-api"
+          ]
+        },
+        "image_lock_ref": {
+          "type": "string",
+          "pattern": "^lock:[a-z0-9-]+$"
+        },
+        "startup_uid": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "long_running_uid": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "cap_drop": {
+          "const": [
+            "ALL"
+          ]
+        },
+        "cap_add": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "CHOWN",
+              "DAC_OVERRIDE",
+              "FOWNER",
+              "SETGID",
+              "SETUID"
+            ]
+          }
+        },
+        "no_new_privileges": {
+          "const": true
+        },
+        "read_only_rootfs": {
+          "type": "boolean"
+        },
+        "writable_mounts": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "target": {
+                "type": "string",
+                "pattern": "^/(?!var/run/docker\\.sock(?:/|$)|run/docker\\.sock(?:/|$))(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$"
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 10
+              }
+            },
+            "required": [
+              "target",
+              "reason"
+            ]
+          }
+        },
+        "tmpfs_mounts": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^/(?!var/run/docker\\.sock(?:/|$)|run/docker\\.sock(?:/|$))(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$"
+          }
+        },
+        "seccomp_mode": {
+          "const": "runtime-default"
+        },
+        "pids_limit": {
+          "type": "integer",
+          "minimum": 16,
+          "maximum": 1024
+        },
+        "memory_limit_mib": {
+          "type": "integer",
+          "minimum": 64,
+          "maximum": 8192
+        },
+        "cpu_limit": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 8
+        },
+        "exception_rationale": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 20
+        }
+      },
+      "required": [
+        "service",
+        "image_lock_ref",
+        "startup_uid",
+        "long_running_uid",
+        "cap_drop",
+        "cap_add",
+        "no_new_privileges",
+        "read_only_rootfs",
+        "writable_mounts",
+        "tmpfs_mounts",
+        "seccomp_mode",
+        "pids_limit",
+        "memory_limit_mib",
+        "cpu_limit",
+        "exception_rationale"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "anyOf": [
+              {
+                "properties": {
+                  "startup_uid": {
+                    "const": 0
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "read_only_rootfs": {
+                    "const": false
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "cap_add": {
+                    "minItems": 1
+                  }
+                }
+              }
+            ]
+          },
+          "then": {
+            "properties": {
+              "exception_rationale": {
+                "type": "string",
+                "minLength": 20
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "exception_rationale": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

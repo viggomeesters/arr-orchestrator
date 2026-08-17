@@ -1,0 +1,289 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.viggomeesters.com/arr-orchestrator/lab-images-lock.schema.json",
+  "title": "Arr Orchestrator lab image lock",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "artifact_kind",
+    "platform",
+    "images"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "1.0.0"
+    },
+    "artifact_kind": {
+      "const": "lab_images_lock"
+    },
+    "platform": {
+      "const": "linux/amd64"
+    },
+    "images": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/image"
+      },
+      "allOf": [
+        {
+          "contains": {
+            "type": "object",
+            "required": [
+              "service"
+            ],
+            "properties": {
+              "service": {
+                "const": "sonarr"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "required": [
+              "service"
+            ],
+            "properties": {
+              "service": {
+                "const": "radarr"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "required": [
+              "service"
+            ],
+            "properties": {
+              "service": {
+                "const": "prowlarr"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "required": [
+              "service"
+            ],
+            "properties": {
+              "service": {
+                "const": "qbittorrent"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "required": [
+              "service"
+            ],
+            "properties": {
+              "service": {
+                "const": "jellyfin"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "required": [
+              "service"
+            ],
+            "properties": {
+              "service": {
+                "const": "controller-base"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "required": [
+              "service"
+            ],
+            "properties": {
+              "service": {
+                "const": "mock-indexer-base"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "required": [
+              "service"
+            ],
+            "properties": {
+              "service": {
+                "const": "fault-api-base"
+              }
+            }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "service": {
+          "enum": [
+            "sonarr",
+            "radarr",
+            "prowlarr",
+            "qbittorrent",
+            "jellyfin",
+            "controller-base",
+            "mock-indexer-base",
+            "fault-api-base"
+          ]
+        },
+        "registry": {
+          "enum": [
+            "docker.io",
+            "ghcr.io",
+            "lscr.io",
+            "quay.io"
+          ]
+        },
+        "repository": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._/-]+$"
+        },
+        "tag": {
+          "type": "string",
+          "pattern": "^(?!latest$)[A-Za-z0-9_.-]+$"
+        },
+        "index_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "manifest_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "config_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "application_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provenance_url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "license_url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "verified_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "attestation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "enum": [
+                "verified",
+                "unavailable"
+              ]
+            },
+            "limitation": {
+              "type": "string",
+              "minLength": 10
+            },
+            "evidence_url": {
+              "type": "string",
+              "format": "uri",
+              "pattern": "^https://"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "unavailable"
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "limitation"
+                ]
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "verified"
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "evidence_url"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "required": [
+        "service",
+        "registry",
+        "repository",
+        "tag",
+        "index_digest",
+        "manifest_digest",
+        "config_digest",
+        "application_version",
+        "provenance_url",
+        "license_url",
+        "verified_at",
+        "attestation"
+      ]
+    }
+  }
+}

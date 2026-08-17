@@ -1,0 +1,393 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.viggomeesters.com/arr-orchestrator/lab-readiness.schema.json",
+  "title": "Arr Orchestrator lab readiness contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "artifact_kind",
+    "services"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "1.0.0"
+    },
+    "artifact_kind": {
+      "const": "lab_readiness"
+    },
+    "services": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sonarr": {
+          "$ref": "#/$defs/service"
+        },
+        "radarr": {
+          "$ref": "#/$defs/service"
+        },
+        "prowlarr": {
+          "$ref": "#/$defs/service"
+        },
+        "qbittorrent": {
+          "$ref": "#/$defs/service"
+        },
+        "jellyfin": {
+          "$ref": "#/$defs/service"
+        },
+        "lab-controller": {
+          "$ref": "#/$defs/service"
+        },
+        "arrctl-runner": {
+          "$ref": "#/$defs/service"
+        },
+        "mock-indexer": {
+          "$ref": "#/$defs/service"
+        },
+        "fault-api": {
+          "$ref": "#/$defs/service"
+        }
+      },
+      "required": [
+        "sonarr",
+        "radarr",
+        "prowlarr",
+        "qbittorrent",
+        "jellyfin",
+        "lab-controller",
+        "arrctl-runner",
+        "mock-indexer",
+        "fault-api"
+      ]
+    }
+  },
+  "$defs": {
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "image_ref": {
+          "type": "string",
+          "pattern": "^lock:[a-z0-9-]+$"
+        },
+        "states": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "process_alive": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "owner": {
+                  "const": "docker"
+                },
+                "probe_location": {
+                  "const": "in_container"
+                },
+                "probe": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "process"
+                    },
+                    "target": {
+                      "const": "main"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "target"
+                  ]
+                },
+                "start_period_seconds": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 300
+                },
+                "interval_seconds": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 60
+                },
+                "max_attempts": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 120
+                },
+                "hard_deadline_seconds": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1800
+                }
+              },
+              "required": [
+                "owner",
+                "probe_location",
+                "probe",
+                "start_period_seconds",
+                "interval_seconds",
+                "max_attempts",
+                "hard_deadline_seconds"
+              ]
+            },
+            "api_live": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "owner": {
+                  "const": "docker"
+                },
+                "probe_location": {
+                  "const": "in_container"
+                },
+                "probe": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "http"
+                    },
+                    "method": {
+                      "const": "GET"
+                    },
+                    "path": {
+                      "type": "string",
+                      "pattern": "^/(?!/)[A-Za-z0-9._~!$&'()*+,;=:@%/-]*$"
+                    },
+                    "expected_status": {
+                      "type": "array",
+                      "minItems": 1,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "integer",
+                        "minimum": 100,
+                        "maximum": 599
+                      }
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "method",
+                    "path",
+                    "expected_status"
+                  ]
+                },
+                "start_period_seconds": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 300
+                },
+                "interval_seconds": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 60
+                },
+                "max_attempts": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 120
+                },
+                "hard_deadline_seconds": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1800
+                }
+              },
+              "required": [
+                "owner",
+                "probe_location",
+                "probe",
+                "start_period_seconds",
+                "interval_seconds",
+                "max_attempts",
+                "hard_deadline_seconds"
+              ]
+            },
+            "api_ready": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "owner": {
+                  "const": "controller"
+                },
+                "probe_location": {
+                  "const": "lab_controller"
+                },
+                "probe": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "http"
+                    },
+                    "method": {
+                      "const": "GET"
+                    },
+                    "path": {
+                      "type": "string",
+                      "pattern": "^/(?!/)[A-Za-z0-9._~!$&'()*+,;=:@%/-]*$"
+                    },
+                    "expected_status": {
+                      "type": "array",
+                      "minItems": 1,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "integer",
+                        "minimum": 100,
+                        "maximum": 599
+                      }
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "method",
+                    "path",
+                    "expected_status"
+                  ]
+                },
+                "start_period_seconds": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 300
+                },
+                "interval_seconds": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 60
+                },
+                "max_attempts": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 120
+                },
+                "hard_deadline_seconds": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1800
+                },
+                "credential_ref": {
+                  "type": "string",
+                  "pattern": "^file:/run/secrets/[a-z0-9-]+$"
+                },
+                "expected_schema_ref": {
+                  "type": "string",
+                  "pattern": "^schema:[a-z0-9-]+$"
+                }
+              },
+              "required": [
+                "owner",
+                "probe_location",
+                "probe",
+                "start_period_seconds",
+                "interval_seconds",
+                "max_attempts",
+                "hard_deadline_seconds",
+                "credential_ref",
+                "expected_schema_ref"
+              ]
+            },
+            "baseline_verified": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "owner": {
+                  "const": "controller"
+                },
+                "probe_location": {
+                  "const": "lab_controller"
+                },
+                "probe": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "http"
+                    },
+                    "method": {
+                      "const": "GET"
+                    },
+                    "path": {
+                      "type": "string",
+                      "pattern": "^/(?!/)[A-Za-z0-9._~!$&'()*+,;=:@%/-]*$"
+                    },
+                    "expected_status": {
+                      "type": "array",
+                      "minItems": 1,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "integer",
+                        "minimum": 100,
+                        "maximum": 599
+                      }
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "method",
+                    "path",
+                    "expected_status"
+                  ]
+                },
+                "start_period_seconds": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 300
+                },
+                "interval_seconds": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 60
+                },
+                "max_attempts": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 120
+                },
+                "hard_deadline_seconds": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1800
+                },
+                "credential_ref": {
+                  "type": "string",
+                  "pattern": "^file:/run/secrets/[a-z0-9-]+$"
+                },
+                "expected_schema_ref": {
+                  "type": "string",
+                  "pattern": "^schema:[a-z0-9-]+$"
+                },
+                "expected_baseline_digest": {
+                  "type": "string",
+                  "pattern": "^sha256:[a-f0-9]{64}$"
+                }
+              },
+              "required": [
+                "owner",
+                "probe_location",
+                "probe",
+                "start_period_seconds",
+                "interval_seconds",
+                "max_attempts",
+                "hard_deadline_seconds",
+                "credential_ref",
+                "expected_schema_ref",
+                "expected_baseline_digest"
+              ]
+            }
+          },
+          "required": [
+            "process_alive",
+            "api_live",
+            "api_ready",
+            "baseline_verified"
+          ]
+        }
+      },
+      "required": [
+        "image_ref",
+        "states"
+      ]
+    }
+  }
+}

@@ -9,6 +9,18 @@
 secrets/
 credentials/
 
+# Disposable lab state is external to the repository; these are defense-in-depth.
+lab/runtime/
+lab/state/
+lab/secrets/
+lab/generated/
+lab/evidence/
+lab/config/
+lab/*.local.json
+**/.arr-orchestrator-lab
+**/config.xml
+**/qBittorrent.conf
+
 # Private deployment and runtime state
 .local/
 runtime/

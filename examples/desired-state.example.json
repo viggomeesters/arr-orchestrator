@@ -1,0 +1,68 @@
+{
+  "contract_version": "1.0.0",
+  "artifact_kind": "desired_state",
+  "profile_id": "synthetic-lab",
+  "services": {
+    "sonarr-main": {
+      "kind": "sonarr",
+      "secret_ref": "file:sonarr/api-key",
+      "desired": {
+        "quality_profile": "synthetic-standard",
+        "root_ref": "tv-library",
+        "enabled": true
+      }
+    },
+    "radarr-main": {
+      "kind": "radarr",
+      "secret_ref": "file:radarr/api-key",
+      "desired": {
+        "quality_profile": "synthetic-standard",
+        "root_ref": "movie-library",
+        "enabled": true
+      }
+    },
+    "prowlarr-main": {
+      "kind": "prowlarr",
+      "secret_ref": "file:prowlarr/api-key",
+      "desired": {
+        "enabled": true,
+        "sync_mode": "full"
+      }
+    },
+    "qbittorrent-main": {
+      "kind": "qbittorrent",
+      "secret_ref": "file:qbittorrent/session",
+      "desired": {
+        "root_ref": "download-root",
+        "category": "synthetic-downloads",
+        "enabled": true
+      }
+    },
+    "jellyfin-main": {
+      "kind": "jellyfin",
+      "secret_ref": "file:jellyfin/api-key",
+      "desired": {
+        "enabled": true
+      }
+    }
+  },
+  "media_roots": {
+    "tv-library": {
+      "purpose": "series",
+      "path_ref": "mount:media/tv"
+    },
+    "movie-library": {
+      "purpose": "movies",
+      "path_ref": "mount:media/movies"
+    },
+    "download-root": {
+      "purpose": "downloads",
+      "path_ref": "mount:data/downloads"
+    }
+  },
+  "policies": {
+    "hardlinks_required": true,
+    "plan_approval": "always",
+    "deletion": "explicit_only"
+  }
+}

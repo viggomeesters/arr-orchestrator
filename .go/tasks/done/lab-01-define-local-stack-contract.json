@@ -1,0 +1,129 @@
+{
+  "schema": "go-workflow.repo-local.task.v1",
+  "kind": "task",
+  "execution_mode": "agent",
+  "shareable_delivery": "none",
+  "id": "lab-01-define-local-stack-contract",
+  "project": "arr-orchestrator",
+  "status": "done",
+  "summary": "Define the local Docker lab contract",
+  "description": "Define topology, external runtime-root containment, image-lock policy, readiness and hardening schemas, threat boundaries, scenario vocabulary, public-safety rules, and reset invariants before Docker implementation.",
+  "scope": {
+    "read": [
+      "AGENTS.md",
+      ".go/vision.json",
+      ".go/architecture-principles.json",
+      "docs/architecture.md",
+      "docs/security-model.md",
+      "docs/contracts.md",
+      "schemas/contracts/v1/**",
+      "examples/desired-state.example.yaml",
+      ".gitignore",
+      "scripts/check_public_safety.py",
+      ".go/project.json",
+      ".go/tasks/done/lab-00-register-lab-workstream.json"
+    ],
+    "modify": [
+      "docs/local-lab.md",
+      "docs/security-model.md",
+      "examples/desired-state.example.yaml",
+      "examples/desired-state.example.json",
+      "schemas/lab-manifest.schema.json",
+      "schemas/lab-images-lock.schema.json",
+      "schemas/lab-readiness.schema.json",
+      "schemas/lab-security-matrix.schema.json",
+      "tests/contracts/test_examples.py",
+      "tests/lab/test_lab_contract.py",
+      "tests/security/test_public_safety.py",
+      "scripts/check_public_safety.py",
+      ".gitignore"
+    ]
+  },
+  "acceptance": [
+    "Runtime paths are outside Git and reject checkout, /mnt, traversal, and symlink escape.",
+    "Lab manifest, image lock, readiness, and security matrix use strict Draft 2020-12 schemas with positive and negative fixtures.",
+    "The network contract requires an internal bridge with isolated gateway mode and forbids published host ports, second application networks, privileged mode, and Docker socket mounts.",
+    "The YAML desired-state example is replaced by schema-valid JSON using synthetic secret_ref values.",
+    "Public-safety checks reject generated service state, secrets, private network identifiers, host paths, and unredacted Docker evidence.",
+    "Reset requires a valid direct-child lab ID, trusted marker, matching Compose project, and bounded labelled resources."
+  ],
+  "verification": [
+    "python3 -m unittest tests.contracts.test_examples tests.lab.test_lab_contract tests.security.test_public_safety",
+    "./go validate .",
+    "bash scripts/check.sh"
+  ],
+  "claim": {
+    "agent": "hermes",
+    "claimed_at": "2026-08-17T09:05:19+02:00"
+  },
+  "work_status": "completed",
+  "review_status": "approved",
+  "review_history": [
+    {
+      "created_at": "2026-08-17T09:46:29+02:00",
+      "agent": "hermes",
+      "status": "approved",
+      "evidence": "Independent Verdict A on exact hash 624088b5ee9dd943b142bc53659675cbb8d308b216a1990ce74199a1681c0b50; 23 task tests, repository gates, schema probes and expanded security escape/leak probes passed; no blockers.",
+      "transaction_id": "75a7ebf59afa4c8ba2fbca8074fbcf25"
+    }
+  ],
+  "evidence": [
+    {
+      "schema": "go-workflow.finish-evidence.v1",
+      "created_at": "2026-08-17T09:46:16+02:00",
+      "task_id": "lab-01-define-local-stack-contract",
+      "agent": "hermes",
+      "summary": "changed_files=.gitignore,.go/runs/events.jsonl,.go/tasks/active/lab-01-define-local-stack-contract.json,.go/tasks/open/lab-01-define-local-stack-contract.json,docs/local-lab.md,docs/security-model.md,examples/desired-state.example.json,examples/desired-state.example.yaml,schemas/lab-images-lock.schema.json,schemas/lab-manifest.schema.json,schemas/lab-readiness.schema.json,schemas/lab-security-matrix.schema.json,scripts/check_public_safety.py,tests/contracts/test_examples.py,tests/lab/test_lab_contract.py,tests/security/test_public_safety.py; verification_command=python3 -m unittest tests.lab.test_lab_contract && python3 -m unittest tests.contracts.test_examples && python3 -m unittest tests.security.test_public_safety && bash scripts/check.sh && git diff --check && ./go validate .; verification_result=passed: lab 11, examples 3, safety 9, CLI 14, contract discovery 24, four schemas meta-valid, repository/public-safety gates green; critic=Verdict A exact hash 624088b5ee9dd943b142bc53659675cbb8d308b216a1990ce74199a1681c0b50, 23 task tests and expanded escape/leak probes passed",
+      "changed_files": [
+        ".gitignore",
+        ".go/runs/events.jsonl",
+        ".go/tasks/active/lab-01-define-local-stack-contract.json",
+        ".go/tasks/open/lab-01-define-local-stack-contract.json",
+        "docs/local-lab.md",
+        "docs/security-model.md",
+        "examples/desired-state.example.json",
+        "examples/desired-state.example.yaml",
+        "schemas/lab-images-lock.schema.json",
+        "schemas/lab-manifest.schema.json",
+        "schemas/lab-readiness.schema.json",
+        "schemas/lab-security-matrix.schema.json",
+        "scripts/check_public_safety.py",
+        "tests/contracts/test_examples.py",
+        "tests/lab/test_lab_contract.py",
+        "tests/security/test_public_safety.py"
+      ],
+      "no_diff": false,
+      "verification": {
+        "command": "python3 -m unittest tests.lab.test_lab_contract && python3 -m unittest tests.contracts.test_examples && python3 -m unittest tests.security.test_public_safety && bash scripts/check.sh && git diff --check && ./go validate .",
+        "result": "passed: lab 11, examples 3, safety 9, CLI 14, contract discovery 24, four schemas meta-valid, repository/public-safety gates green"
+      },
+      "runtime": {
+        "agent": "hermes",
+        "runtime": null,
+        "model": null,
+        "billing_mode": "unknown"
+      },
+      "usage": {
+        "schema": "go-workflow.usage-attribution.v1",
+        "runtime_kind": "unknown",
+        "billing_mode": "unknown",
+        "owner": "hermes",
+        "model": null,
+        "token_estimate": null,
+        "api_equivalent_cost_usd": null,
+        "provider_invoice_cost_usd": null,
+        "cost_label": "api_equivalent_not_invoice_cost"
+      },
+      "review": {
+        "outcome": "Verdict A exact hash 624088b5ee9dd943b142bc53659675cbb8d308b216a1990ce74199a1681c0b50, 23 task tests and expanded escape/leak probes passed",
+        "skip_reason": null
+      }
+    }
+  ],
+  "depends_on": [
+    "lab-00-register-lab-workstream"
+  ],
+  "priority": 4,
+  "delivery": "lab_contract",
+  "order": 4
+}

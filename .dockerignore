@@ -10,3 +10,11 @@ scripts/*
 !lab/
 lab/*
 !lab/Dockerfile.controller
+!lab/__init__.py
+!lab/host/
+!lab/host/**
+!lab/controller/
+!lab/controller/**
+lab/**/__pycache__/
+lab/**/__pycache__/**
+lab/**/*.py[cod]

@@ -1,0 +1,127 @@
+{
+  "schema": "go-workflow.repo-local.task.v1",
+  "kind": "task",
+  "execution_mode": "agent",
+  "shareable_delivery": "none",
+  "id": "lab-04-bootstrap-services",
+  "project": "arr-orchestrator",
+  "status": "done",
+  "summary": "Bootstrap disposable real arr services",
+  "description": "Generate per-run credentials and minimal first-start authentication config on the host, start the five real services, perform supported-API domain seeding from lab-controller, and prove baseline_verified idempotently.",
+  "scope": {
+    "read": [
+      "docs/local-lab.md",
+      "lab/compose.yaml",
+      "lab/images.lock.json",
+      "lab/readiness.json",
+      "lab/security-matrix.json",
+      "lab/services/**",
+      "scripts/lab.py",
+      "AGENTS.md",
+      ".go/project.json",
+      ".go/vision.json",
+      ".go/architecture-principles.json",
+      "docs/architecture.md",
+      "docs/security-model.md",
+      ".go/tasks/done/lab-03-add-deterministic-dependency-doubles.json"
+    ],
+    "modify": [
+      ".dockerignore",
+      "lab/Dockerfile.controller",
+      "lab/compose.yaml",
+      "lab/readiness.json",
+      "lab/security-matrix.json",
+      "lab/services/mock-indexer/server.py",
+      "lab/__init__.py",
+      "lab/host/__init__.py",
+      "lab/host/runtime.py",
+      "lab/host/secrets.py",
+      "lab/controller/__init__.py",
+      "lab/controller/bootstrap.py",
+      "tests/lab/test_bootstrap.py",
+      "tests/lab/test_compose_contract.py",
+      "tests/lab/test_lab_contract.py",
+      "tests/lab/test_service_doubles.py",
+      "scripts/lab.py"
+    ]
+  },
+  "acceptance": [
+    "A clean marked lab reaches process_alive, api_live, api_ready, and baseline_verified for all five real services without UI clicks.",
+    "Sonarr, Radarr, Prowlarr, qBittorrent, and Jellyfin use documented pinned-version first-start authentication and supported APIs for domain seeding.",
+    "Generated credentials remain outside Git and do not appear in stdout, logs, Compose output, inspect data, diagnostics, snapshots, or evidence under direct, encoded, quoted, or URL-escaped forms.",
+    "Bootstrap is idempotent and a second run produces no normalized configuration drift.",
+    "Prowlarr uses only the local mock indexer and local application links; Jellyfin scans no host or private media.",
+    "Runtime inspect matches readiness and security matrices."
+  ],
+  "verification": [
+    "python3 -m unittest tests.lab.test_bootstrap",
+    "python3 scripts/lab.py test bootstrap",
+    "bash scripts/check.sh"
+  ],
+  "claim": {
+    "agent": "hermes",
+    "claimed_at": "2026-08-17T11:28:02+02:00"
+  },
+  "work_status": "completed",
+  "review_status": "review",
+  "review_history": [],
+  "evidence": [
+    {
+      "schema": "go-workflow.finish-evidence.v1",
+      "created_at": "2026-08-17T12:48:20+02:00",
+      "task_id": "lab-04-bootstrap-services",
+      "agent": "hermes",
+      "summary": "changed_files=.dockerignore,lab/Dockerfile.controller,lab/__init__.py,lab/compose.yaml,lab/controller/__init__.py,lab/controller/bootstrap.py,lab/host/__init__.py,lab/host/runtime.py,lab/host/secrets.py,lab/readiness.json,lab/security-matrix.json,lab/services/mock-indexer/server.py,scripts/lab.py,tests/lab/test_bootstrap.py,tests/lab/test_compose_contract.py,tests/lab/test_service_doubles.py; verification=89 explicit tests + docker compose config + python3 scripts/lab.py test bootstrap + bash scripts/check.sh + git diff --check + ./go validate . rc=0; critic=Verdict A exact hash 1fac6ece502810bbe6075d525cf343d89411ce652c84de7dc4c0258de0226e74 no blockers; runtime=hermes-agent; billing_mode=subscription; owner=viggo",
+      "changed_files": [
+        ".dockerignore",
+        "lab/Dockerfile.controller",
+        "lab/__init__.py",
+        "lab/compose.yaml",
+        "lab/controller/__init__.py",
+        "lab/controller/bootstrap.py",
+        "lab/host/__init__.py",
+        "lab/host/runtime.py",
+        "lab/host/secrets.py",
+        "lab/readiness.json",
+        "lab/security-matrix.json",
+        "lab/services/mock-indexer/server.py",
+        "scripts/lab.py",
+        "tests/lab/test_bootstrap.py",
+        "tests/lab/test_compose_contract.py",
+        "tests/lab/test_service_doubles.py"
+      ],
+      "no_diff": false,
+      "verification": {
+        "command": "89 explicit tests + docker compose config + python3 scripts/lab.py test bootstrap + bash scripts/check.sh + git diff --check + ./go validate . rc=0",
+        "result": "89 explicit tests + docker compose config + python3 scripts/lab.py test bootstrap + bash scripts/check.sh + git diff --check + ./go validate . rc=0"
+      },
+      "runtime": {
+        "agent": "hermes",
+        "runtime": "hermes-agent",
+        "model": null,
+        "billing_mode": "subscription"
+      },
+      "usage": {
+        "schema": "go-workflow.usage-attribution.v1",
+        "runtime_kind": "hermes-agent",
+        "billing_mode": "subscription",
+        "owner": "viggo",
+        "model": null,
+        "token_estimate": null,
+        "api_equivalent_cost_usd": null,
+        "provider_invoice_cost_usd": null,
+        "cost_label": "api_equivalent_not_invoice_cost"
+      },
+      "review": {
+        "outcome": "Verdict A exact hash 1fac6ece502810bbe6075d525cf343d89411ce652c84de7dc4c0258de0226e74 no blockers",
+        "skip_reason": null
+      }
+    }
+  ],
+  "depends_on": [
+    "lab-03-add-deterministic-dependency-doubles"
+  ],
+  "priority": 7,
+  "delivery": "lab_foundation",
+  "order": 7
+}

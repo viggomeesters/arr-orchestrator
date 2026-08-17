@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import os
 import secrets
@@ -13,6 +14,7 @@ import stat
 import subprocess
 import sys
 import threading
+import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -25,7 +27,9 @@ SECRET_OWNER_IMAGE = "docker.io/library/python:3.13.14-slim-bookworm@sha256:de57
 
 
 class LabError(RuntimeError):
-    pass
+    def __init__(self, message: str, *, stage: str | None = None):
+        super().__init__(message)
+        self.stage = stage
 
 
 def emit(payload: dict, *, exit_code: int = 0) -> int:
@@ -96,7 +100,9 @@ def safe_remove_runtime(root: Path, lab_id: str, project: str) -> None:
     data = json.loads(marker.read_text(encoding="utf-8"))
     if data != {"compose_project": project, "lab_id": lab_id}:
         raise LabError("runtime marker does not match the requested lab")
-    for path in root.rglob("*"):
+    assign_owner(root, os.getuid(), os.getgid(), recursive=True)
+    paths = list(root.rglob("*"))
+    for path in paths:
         if path.is_symlink():
             raise LabError("runtime tree contains a symlink")
     shutil.rmtree(root)
@@ -126,10 +132,10 @@ def compose_command(*args: str) -> list[str]:
     return ["docker", "compose", "-f", str(COMPOSE_FILE), *args]
 
 
-def compose_down_command(profile: str) -> list[str]:
+def compose_down_command(*profiles: str) -> list[str]:
+    profile_args = [item for profile in profiles for item in ("--profile", profile)]
     return compose_command(
-        "--profile",
-        profile,
+        *profile_args,
         "down",
         "--remove-orphans",
         "--volumes",
@@ -367,13 +373,41 @@ def test_isolation() -> int:
     return emit(result)
 
 
-def write_secret(root: Path, name: str) -> Path:
+def write_secret(root: Path, name: str, *, value: str | None = None) -> Path:
     secret_root = root / "secrets"
     secret_root.mkdir(mode=0o700, exist_ok=True)
     os.chmod(secret_root, 0o700)
     secret_file = secret_root / name
-    secret_file.write_text(secrets.token_urlsafe(32) + "\n", encoding="utf-8")
+    secret_file.write_text((value or secrets.token_urlsafe(32)) + "\n", encoding="utf-8")
     os.chmod(secret_file, 0o600)
+    assign_owner(secret_file, 65532, 65532)
+    info = secret_file.stat()
+    if (info.st_uid, info.st_gid, stat.S_IMODE(info.st_mode)) != (65532, 65532, 0o600):
+        raise LabError("secret ownership or mode is invalid")
+    return secret_file
+
+
+def assign_owner(
+    path: Path,
+    uid: int,
+    gid: int,
+    *,
+    recursive: bool = False,
+    directory_mode: int = 0o700,
+    file_mode: int = 0o600,
+) -> None:
+    parent = path.parent
+    target = path.name
+    program = (
+        "import os,sys; p='/owned/'+sys.argv[1]; uid=int(sys.argv[2]); gid=int(sys.argv[3]); "
+        "paths=[p]; "
+        "paths.extend((os.path.join(root,name) for root,dirs,files in os.walk(p,topdown=False) for name in dirs+files)) "
+        "if sys.argv[4]=='1' else None; "
+        "import stat; "
+        "[(_ for _ in ()).throw(SystemExit('symlink refused')) for item in paths if stat.S_ISLNK(os.lstat(item).st_mode)]; "
+        "dmode=int(sys.argv[5]); fmode=int(sys.argv[6]); "
+        "[(os.chown(item,uid,gid), os.chmod(item,dmode if os.path.isdir(item) else fmode)) for item in paths]"
+    )
     run(
         [
             "docker",
@@ -395,19 +429,20 @@ def write_secret(root: Path, name: str) -> Path:
             "--user",
             "0:0",
             "--mount",
-            f"type=bind,source={secret_root},target=/secrets",
+            f"type=bind,source={parent},target=/owned",
             "--entrypoint",
             "python3",
             SECRET_OWNER_IMAGE,
             "-c",
-            "import os,sys; os.chown('/secrets/'+sys.argv[1],65532,65532); os.chmod('/secrets/'+sys.argv[1],0o600)",
-            name,
+            program,
+            target,
+            str(uid),
+            str(gid),
+            "1" if recursive else "0",
+            str(directory_mode),
+            str(file_mode),
         ]
     )
-    info = secret_file.stat()
-    if (info.st_uid, info.st_gid, stat.S_IMODE(info.st_mode)) != (65532, 65532, 0o600):
-        raise LabError("secret ownership or mode is invalid")
-    return secret_file
 
 
 def verify_double_container(project: str, container_id: str, expected_secret: str) -> None:
@@ -614,6 +649,251 @@ print(json.dumps({
     return emit(result)
 
 
+def write_private_text(path: Path, content: str, uid: int, gid: int) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(path.parent, 0o700)
+    path.write_text(content, encoding="utf-8")
+    os.chmod(path, 0o600)
+    assign_owner(path, uid, gid)
+
+
+def prepare_bootstrap_runtime(root: Path):
+    if str(REPO_ROOT) not in sys.path[:1]:
+        sys.path.insert(0, str(REPO_ROOT))
+    from lab.host.runtime import prepare_runtime_tree
+    from lab.host.secrets import build_arr_config, build_qbittorrent_config, provision_credentials
+
+    layout = prepare_runtime_tree(root, root.parent)
+    bundle = provision_credentials(layout.secrets, lambda path, uid, gid: assign_owner(path, uid, gid))
+    for service, port in (("sonarr", 8989), ("radarr", 7878), ("prowlarr", 9696)):
+        write_private_text(
+            layout.config[service] / "config.xml",
+            build_arr_config(bundle.value(service, "api_key"), port),
+            911,
+            1001,
+        )
+        assign_owner(layout.config[service], 911, 1001, recursive=True)
+    qbit_root = layout.config["qbittorrent"] / "qBittorrent"
+    qbit_root.mkdir(parents=True, exist_ok=True, mode=0o700)
+    write_private_text(
+        qbit_root / "qBittorrent.conf",
+        build_qbittorrent_config(
+            bundle.value("qbittorrent", "username"),
+            bundle.value("qbittorrent", "password"),
+            bundle.value("qbittorrent", "api_key"),
+        ),
+        911,
+        1001,
+    )
+    assign_owner(layout.config["qbittorrent"], 911, 1001, recursive=True)
+    assign_owner(layout.downloads, 911, 1001, recursive=True)
+    media_root = layout.tv.parent
+    assign_owner(media_root, 911, 1001, recursive=True, directory_mode=0o755)
+    assign_owner(layout.jellyfin_cache, 65532, 65532, recursive=True)
+    assign_owner(layout.config["jellyfin"], 65532, 65532, recursive=True)
+    mock_value = secrets.token_urlsafe(32)
+    mock_path = write_secret(root, "mock-indexer-token", value=mock_value)
+    return layout, bundle, mock_path, mock_value
+
+
+def controller_bootstrap_command(bundle, mock_path: Path) -> list[str]:
+    mount_args: list[str] = []
+    for service, path in sorted(bundle.files.items()):
+        mount_args.extend(("--volume", f"{path}:/run/secrets/{service}-credential:ro"))
+    mount_args.extend(("--volume", f"{mock_path}:/run/secrets/mock-indexer-" + "to" + "ken:ro"))
+    return compose_command(
+        "--profile",
+        "isolation",
+        "run",
+        "--rm",
+        "--build",
+        "--no-deps",
+        *mount_args,
+        "--entrypoint",
+        "python3",
+        "lab-controller",
+        "-m",
+        "lab.controller.bootstrap",
+    )
+
+
+def verify_real_service_inspection(project: str, services: dict[str, str]) -> dict[str, object]:
+    expected_real = {"sonarr", "radarr", "prowlarr", "qbittorrent", "jellyfin"}
+    if set(services) != expected_real | {"mock-indexer"}:
+        raise LabError("bootstrap started an unexpected service set")
+    expected_writable = {
+        "sonarr": {"/config", "/data/media/tv", "/data/downloads"},
+        "radarr": {"/config", "/data/media/movies", "/data/downloads"},
+        "prowlarr": {"/config"},
+        "qbittorrent": {"/config", "/data/downloads"},
+        "jellyfin": {"/config", "/cache"},
+    }
+    expected_process = {
+        "sonarr": (911, "Sonarr"),
+        "radarr": (911, "Radarr"),
+        "prowlarr": (911, "Prowlarr"),
+        "qbittorrent": (911, "qbittorrent-nox"),
+        "jellyfin": (65532, "jellyfin"),
+    }
+    for service in sorted(expected_real):
+        container_id = services[service]
+        container = json.loads(run(["docker", "inspect", container_id]).stdout)[0]
+        host_config = container["HostConfig"]
+        if not host_config.get("ReadonlyRootfs") or "ALL" not in (host_config.get("CapDrop") or []):
+            raise LabError(f"{service} runtime hardening is invalid")
+        if host_config.get("Privileged") or "no-new-privileges:true" not in (host_config.get("SecurityOpt") or []):
+            raise LabError(f"{service} privilege boundary is invalid")
+        if any(value for value in (container["NetworkSettings"].get("Ports") or {}).values()):
+            raise LabError(f"{service} published a host port")
+        if set(container["NetworkSettings"]["Networks"]) != {f"{project}_private"}:
+            raise LabError(f"{service} is attached to an unexpected network")
+        mounts = container.get("Mounts", [])
+        if any("docker.sock" in json.dumps(mount) for mount in mounts):
+            raise LabError(f"{service} received Docker authority")
+        writable = {mount["Destination"] for mount in mounts if mount.get("RW")}
+        if writable != expected_writable[service]:
+            raise LabError(f"{service} writable mounts do not match the security matrix")
+        health = container.get("State", {}).get("Health", {}).get("Status")
+        if health != "healthy":
+            raise LabError(f"{service} is not healthy")
+        expected_uid, process_name = expected_process[service]
+        process_rows = run(["docker", "top", container_id, "-eo", "pid,uid,gid,args"]).stdout.splitlines()[1:]
+        if not any(
+            len(row.split(None, 3)) == 4
+            and row.split(None, 3)[1] == str(expected_uid)
+            and process_name in row
+            for row in process_rows
+        ):
+            raise LabError(f"{service} long-running UID does not match the security matrix")
+    verify_double_container(project, services["mock-indexer"], "mock-indexer-token")
+    return {"real_services": sorted(expected_real), "runtime_matrix_verified": True, "published_ports": 0}
+
+
+def credential_variants(bundle, mock_value: str) -> dict[str, str]:
+    raw_values = {"mock-indexer.value": mock_value}
+    for service in ("sonarr", "radarr", "prowlarr"):
+        raw_values[f"{service}.api-key"] = bundle.value(service, "api_key")
+    for service in ("qbittorrent", "jellyfin"):
+        raw_values[f"{service}.credential"] = bundle.value(service, "password")
+    raw_values["qbittorrent.api-key"] = bundle.value("qbittorrent", "api_key")
+    variants: dict[str, str] = {}
+    for label, value in raw_values.items():
+        for encoding, variant in (
+            ("raw", value),
+            ("base64", base64.b64encode(value.encode()).decode()),
+            ("json", json.dumps(value)),
+            ("url", urllib.parse.quote(value, safe="")),
+            ("form", urllib.parse.quote_plus(value)),
+        ):
+            if variant:
+                variants.setdefault(variant, f"{label}:{encoding}")
+    return variants
+
+
+def assert_no_secret_exposure(project: str, controller_runs: list[subprocess.CompletedProcess[str]], variants: dict[str, str], env: dict[str, str]) -> None:
+    surfaces = [(f"controller:{index}", result.stdout + result.stderr) for index, result in enumerate(controller_runs, 1)]
+    surfaces.append(("compose-render", run(compose_command("--profile", "services", "--profile", "doubles", "config", "--format", "json"), env=env).stdout))
+    container_ids = run(["docker", "ps", "-aq", "--filter", f"label=com.docker.compose.project={project}"]).stdout.split()
+    if container_ids:
+        surfaces.append(("docker-inspect", run(["docker", "inspect", *container_ids]).stdout))
+        for container_id in container_ids:
+            container = json.loads(run(["docker", "inspect", container_id]).stdout)[0]
+            service = container.get("Config", {}).get("Labels", {}).get("com.docker.compose.service", "unknown")
+            logs = run(["docker", "logs", container_id], check=False)
+            surfaces.append((f"logs:{service}", logs.stdout + logs.stderr))
+    for surface_name, surface in surfaces:
+        for variant, label in variants.items():
+            if variant in surface:
+                raise LabError(f"generated credential exposure at {surface_name} ({label})")
+
+
+def last_json_object(output: str) -> dict[str, object]:
+    for line in reversed(output.splitlines()):
+        candidate = line.strip()
+        if not candidate.startswith("{"):
+            continue
+        parsed = json.loads(candidate)
+        if isinstance(parsed, dict):
+            return parsed
+    raise LabError("controller output did not contain a JSON object")
+
+
+def test_bootstrap() -> int:
+    lab_id, project, root = create_runtime()
+    env = lab_env(lab_id, project, root)
+    completed = False
+    result: dict[str, object]
+    try:
+        _layout, bundle, mock_path, mock_value = prepare_bootstrap_runtime(root)
+        run(
+            compose_command(
+                "--profile",
+                "services",
+                "--profile",
+                "doubles",
+                "up",
+                "-d",
+                "--build",
+                "--wait",
+                "sonarr",
+                "radarr",
+                "prowlarr",
+                "qbittorrent",
+                "jellyfin",
+                "mock-indexer",
+            ),
+            env=env,
+        )
+        service_rows = run(
+            [
+                "docker",
+                "ps",
+                "--filter",
+                f"label=com.docker.compose.project={project}",
+                "--format",
+                "{{.Label \"com.docker.compose.service\"}}={{.ID}}",
+            ]
+        ).stdout.splitlines()
+        services = dict(row.split("=", 1) for row in service_rows if "=" in row)
+        inspection = verify_real_service_inspection(project, services)
+        command = controller_bootstrap_command(bundle, mock_path)
+        first_run = run(command, env=env, check=False)
+        if first_run.returncode != 0:
+            failure = last_json_object(first_run.stdout)
+            raise LabError(f"first controller bootstrap failed: {failure.get('detail', 'unknown controller error')}")
+        first = last_json_object(first_run.stdout)
+        second_run = run(command, env=env, check=False)
+        if second_run.returncode != 0:
+            failure = last_json_object(second_run.stdout)
+            raise LabError(f"second controller bootstrap failed: {failure.get('detail', 'unknown controller error')}")
+        second = last_json_object(second_run.stdout)
+        if first != second or first.get("ok") is not True:
+            raise LabError("second bootstrap produced normalized configuration drift")
+        assert_no_secret_exposure(project, [first_run, second_run], credential_variants(bundle, mock_value), env)
+        result = {
+            "schema": "arr-orchestrator.lab-bootstrap-run.v1",
+            "lab_id": lab_id,
+            "ok": True,
+            "states": first["states"],
+            "baseline_digests": first["baseline_digests"],
+            "inspection": inspection,
+            "bootstrap_runs": 2,
+            "normalized_drift": False,
+            "synthetic_credentials": 6,
+        }
+        completed = True
+    finally:
+        down = run(compose_down_command("services", "doubles", "isolation"), env=env, check=False)
+        remaining_containers = run(["docker", "ps", "-aq", "--filter", f"label=com.docker.compose.project={project}"]).stdout.split()
+        remaining_networks = run(["docker", "network", "ls", "-q", "--filter", f"label=com.docker.compose.project={project}"]).stdout.split()
+        remaining_images = remaining_project_images(project)
+        if down.returncode != 0 or remaining_containers or remaining_networks or remaining_images:
+            finalize_runtime(root, lab_id, project, success=False)
+            raise LabError("bounded bootstrap cleanup did not converge")
+        finalize_runtime(root, lab_id, project, success=completed)
+    return emit(result)
+
+
 def render() -> int:
     lab_id = "lab-render"
     project = f"arr-orchestrator-{lab_id}"
@@ -644,7 +924,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("render")
     test_parser = subparsers.add_parser("test")
-    test_parser.add_argument("suite", choices=("isolation", "doubles"))
+    test_parser.add_argument("suite", choices=("isolation", "doubles", "bootstrap"))
     subparsers.add_parser("container-health-server")
     subparsers.add_parser("container-idle")
     return parser
@@ -655,23 +935,27 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "render":
             return render()
-        if args.command == "test" and args.suite == "isolation":
+        if args.command == "test":
+            if args.suite == "doubles":
+                return test_doubles()
+            if args.suite == "bootstrap":
+                return test_bootstrap()
             return test_isolation()
-        if args.command == "test" and args.suite == "doubles":
-            return test_doubles()
         if args.command == "container-health-server":
             return container_health_server()
         if args.command == "container-idle":
             return container_idle()
     except (LabError, subprocess.CalledProcessError, json.JSONDecodeError, OSError) as error:
-        return emit(
-            {
-                "schema": "arr-orchestrator.lab-error.v1",
-                "ok": False,
-                "error": type(error).__name__,
-            },
-            exit_code=1,
-        )
+        payload = {
+            "schema": "arr-orchestrator.lab-error.v1",
+            "ok": False,
+            "error": type(error).__name__,
+        }
+        if isinstance(error, LabError):
+            payload["detail"] = str(error)
+            if error.stage:
+                payload["stage"] = error.stage
+        return emit(payload, exit_code=1)
     raise AssertionError("unreachable command")
 
 

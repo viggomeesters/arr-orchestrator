@@ -115,6 +115,31 @@ class ServiceDoubleContractTests(unittest.TestCase):
         self.assertEqual((200, "application/json", expected), first)
         self.assertEqual(first, second)
 
+    def test_mock_indexer_newznab_search_returns_one_local_result(self):
+        mock = load_module("mock_indexer_newznab", MOCK_SOURCE)
+        status, content_type, body = mock.newznab_response(
+            {"apikey": ["synthetic-token"], "t": ["search"]}, "synthetic-token"
+        )
+        self.assertEqual(200, status)
+        self.assertEqual("application/rss+xml", content_type)
+        text = body.decode("utf-8")
+        self.assertIn('newznab:response offset="0" total="1"', text)
+        self.assertIn("synthetic-1", text)
+        self.assertIn("/download/synthetic-1.nzb", text)
+        self.assertIn('newznab:attr name="category" value="5000"', text)
+
+    def test_mock_indexer_exposes_only_the_synthetic_nzb_download(self):
+        mock = load_module("mock_indexer_download", MOCK_SOURCE)
+        status, content_type, body = mock.response_for(
+            "/download/synthetic-1.nzb", None, "synthetic-token"
+        )
+        self.assertEqual((200, "application/x-nzb"), (status, content_type))
+        self.assertIn(b"<nzb", body)
+        self.assertEqual(
+            (404, "application/json", b'{"error":"not_found"}'),
+            mock.response_for("/download/unknown.nzb", None, "synthetic-token"),
+        )
+
     def test_fault_scenarios_are_exact_and_resettable(self):
         fault = load_module("fault_api_double", FAULT_SOURCE)
         expected = {

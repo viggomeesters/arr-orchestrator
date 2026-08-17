@@ -2,7 +2,7 @@ FROM docker.io/library/python:3.13.14-slim-bookworm@sha256:de572b33eae61a53675a8
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app/src
+    PYTHONPATH=/app/src:/app
 
 RUN groupadd --gid 65532 app \
     && useradd --uid 65532 --gid 65532 --no-create-home --shell /usr/sbin/nologin app
@@ -10,6 +10,8 @@ RUN groupadd --gid 65532 app \
 WORKDIR /app
 COPY --chown=65532:65532 src /app/src
 COPY --chown=65532:65532 scripts/lab.py /app/scripts/lab.py
+COPY --chown=65532:65532 lab/host /app/lab/host
+COPY --chown=65532:65532 lab/controller /app/lab/controller
 
 USER 65532:65532
 ENTRYPOINT ["python3", "/app/scripts/lab.py"]

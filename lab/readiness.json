@@ -68,7 +68,7 @@
           "hard_deadline_seconds": 70,
           "credential_ref": "file:/run/secrets/sonarr-credential",
           "expected_schema_ref": "schema:sonarr-baseline",
-          "expected_baseline_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000001"
+          "expected_baseline_digest": "sha256:aa37d8cdf0d378d20304362cba293f6edde571bbcdbc227bf16aa5349170d804"
         }
       }
     },
@@ -138,7 +138,7 @@
           "hard_deadline_seconds": 70,
           "credential_ref": "file:/run/secrets/radarr-credential",
           "expected_schema_ref": "schema:radarr-baseline",
-          "expected_baseline_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000002"
+          "expected_baseline_digest": "sha256:812ca320f084ead9a82b04d7dcea2796e2ee7e8b08d34507521c30b21967cd0d"
         }
       }
     },
@@ -208,7 +208,7 @@
           "hard_deadline_seconds": 70,
           "credential_ref": "file:/run/secrets/prowlarr-credential",
           "expected_schema_ref": "schema:prowlarr-baseline",
-          "expected_baseline_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000003"
+          "expected_baseline_digest": "sha256:89f596c2592ad57d05bd9b068f7ad6b373fc65cd8cf6ee19e795d373392794d8"
         }
       }
     },
@@ -278,7 +278,7 @@
           "hard_deadline_seconds": 70,
           "credential_ref": "file:/run/secrets/qbittorrent-credential",
           "expected_schema_ref": "schema:qbittorrent-baseline",
-          "expected_baseline_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000004"
+          "expected_baseline_digest": "sha256:eea1045b5c8eec8239857c7993990f1cb68733ba6978257a7b3ed9c8b8ed6ded"
         }
       }
     },
@@ -348,7 +348,7 @@
           "hard_deadline_seconds": 70,
           "credential_ref": "file:/run/secrets/jellyfin-credential",
           "expected_schema_ref": "schema:jellyfin-baseline",
-          "expected_baseline_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000005"
+          "expected_baseline_digest": "sha256:7b8b7ab0b45e6bfcad7482c20d1ca6e35c015b61265d416efb7c4bf76d3c00ba"
         }
       }
     },

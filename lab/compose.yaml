@@ -14,8 +14,6 @@ x-common-security: &common-security
     - private
 
 x-linuxserver-environment: &linuxserver-environment
-  PUID: "1000"
-  PGID: "1000"
   TZ: Etc/UTC
   UMASK: "022"
 
@@ -33,6 +31,7 @@ services:
     cpus: 1.0
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=64m
+      - /run:rw,exec,nosuid,nodev,size=16m
     volumes:
       - type: bind
         source: "${ARR_LAB_ROOT:-/var/empty/arr-orchestrator-lab}/config/sonarr"
@@ -63,6 +62,7 @@ services:
     cpus: 1.0
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=64m
+      - /run:rw,exec,nosuid,nodev,size=16m
     volumes:
       - type: bind
         source: "${ARR_LAB_ROOT:-/var/empty/arr-orchestrator-lab}/config/radarr"
@@ -93,6 +93,7 @@ services:
     cpus: 1.0
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=64m
+      - /run:rw,exec,nosuid,nodev,size=16m
     volumes:
       - type: bind
         source: "${ARR_LAB_ROOT:-/var/empty/arr-orchestrator-lab}/config/prowlarr"
@@ -119,6 +120,7 @@ services:
     cpus: 1.0
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=64m
+      - /run:rw,exec,nosuid,nodev,size=16m
     volumes:
       - type: bind
         source: "${ARR_LAB_ROOT:-/var/empty/arr-orchestrator-lab}/config/qbittorrent"

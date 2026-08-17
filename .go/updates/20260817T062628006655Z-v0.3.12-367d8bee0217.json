@@ -1,0 +1,71 @@
+{
+  "schema": "go-workflow.stack-update-rollback.v1",
+  "status": "applied",
+  "created_at": "2026-08-17T06:26:28.006735+00:00",
+  "target": ".go/project.json",
+  "from_ref": "v0.3.11",
+  "to_ref": "v0.3.12",
+  "resolved_commit": "367d8bee0217d2882fc5ff28ac7c919ca03ae7ce",
+  "before_project": {
+    "schema": "go-workflow.repo-local.project.v1",
+    "kind": "project",
+    "id": "arr-orchestrator",
+    "name": "Arr Orchestrator",
+    "source_of_truth": "repo-local",
+    "contract_version": 2,
+    "project_mode": "project",
+    "required_stack_version": "0.3.11",
+    "stack_ref": "v0.3.11",
+    "default_verification": [
+      "bash scripts/check.sh"
+    ],
+    "links": {
+      "repo": "https://github.com/viggomeesters/arr-orchestrator"
+    },
+    "repository_profile": "public-professional",
+    "default_branch": "main",
+    "quality_gates": [
+      "bash scripts/check.sh",
+      "python3 scripts/validate_vision.py",
+      "python3 scripts/check_public_safety.py",
+      "python3 scripts/check_hero.py",
+      "git diff --check"
+    ],
+    "runtime_state_policy": {
+      "location": "outside_git",
+      "config": "${XDG_CONFIG_HOME:-~/.config}/arr-orchestrator",
+      "data": "${XDG_DATA_HOME:-~/.local/share}/arr-orchestrator"
+    }
+  },
+  "after_project": {
+    "schema": "go-workflow.repo-local.project.v1",
+    "kind": "project",
+    "id": "arr-orchestrator",
+    "name": "Arr Orchestrator",
+    "source_of_truth": "repo-local",
+    "contract_version": 2,
+    "project_mode": "project",
+    "required_stack_version": "0.3.12",
+    "stack_ref": "v0.3.12",
+    "default_verification": [
+      "bash scripts/check.sh"
+    ],
+    "links": {
+      "repo": "https://github.com/viggomeesters/arr-orchestrator"
+    },
+    "repository_profile": "public-professional",
+    "default_branch": "main",
+    "quality_gates": [
+      "bash scripts/check.sh",
+      "python3 scripts/validate_vision.py",
+      "python3 scripts/check_public_safety.py",
+      "python3 scripts/check_hero.py",
+      "git diff --check"
+    ],
+    "runtime_state_policy": {
+      "location": "outside_git",
+      "config": "${XDG_CONFIG_HOME:-~/.config}/arr-orchestrator",
+      "data": "${XDG_DATA_HOME:-~/.local/share}/arr-orchestrator"
+    }
+  }
+}

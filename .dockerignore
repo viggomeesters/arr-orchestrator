@@ -1,0 +1,12 @@
+*
+!src/
+!src/**
+**/__pycache__/
+**/__pycache__/**
+**/*.py[cod]
+!scripts/
+scripts/*
+!scripts/lab.py
+!lab/
+lab/*
+!lab/Dockerfile.controller

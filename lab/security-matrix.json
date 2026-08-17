@@ -1,0 +1,269 @@
+{
+  "contract_version": "1.0.0",
+  "artifact_kind": "lab_security_matrix",
+  "platform": "linux/amd64",
+  "services": [
+    {
+      "service": "sonarr",
+      "image_lock_ref": "lock:sonarr",
+      "startup_uid": 0,
+      "long_running_uid": 1000,
+      "cap_drop": [
+        "ALL"
+      ],
+      "cap_add": [
+        "CHOWN",
+        "DAC_OVERRIDE",
+        "FOWNER",
+        "SETGID",
+        "SETUID"
+      ],
+      "no_new_privileges": true,
+      "read_only_rootfs": true,
+      "writable_mounts": [
+        {
+          "target": "/config",
+          "reason": "Service configuration."
+        },
+        {
+          "target": "/data/media/tv",
+          "reason": "Synthetic television library."
+        },
+        {
+          "target": "/data/downloads",
+          "reason": "Synthetic completed downloads."
+        }
+      ],
+      "tmpfs_mounts": [
+        "/tmp"
+      ],
+      "seccomp_mode": "runtime-default",
+      "pids_limit": 128,
+      "memory_limit_mib": 512,
+      "cpu_limit": 1.0,
+      "exception_rationale": "Pinned LinuxServer s6 init starts as root only to prepare the synthetic /config mount, then drops to UID 1000; exact add-back capabilities are bounded and verified at runtime."
+    },
+    {
+      "service": "radarr",
+      "image_lock_ref": "lock:radarr",
+      "startup_uid": 0,
+      "long_running_uid": 1000,
+      "cap_drop": [
+        "ALL"
+      ],
+      "cap_add": [
+        "CHOWN",
+        "DAC_OVERRIDE",
+        "FOWNER",
+        "SETGID",
+        "SETUID"
+      ],
+      "no_new_privileges": true,
+      "read_only_rootfs": true,
+      "writable_mounts": [
+        {
+          "target": "/config",
+          "reason": "Service configuration."
+        },
+        {
+          "target": "/data/media/movies",
+          "reason": "Synthetic movie library."
+        },
+        {
+          "target": "/data/downloads",
+          "reason": "Synthetic completed downloads."
+        }
+      ],
+      "tmpfs_mounts": [
+        "/tmp"
+      ],
+      "seccomp_mode": "runtime-default",
+      "pids_limit": 128,
+      "memory_limit_mib": 512,
+      "cpu_limit": 1.0,
+      "exception_rationale": "Pinned LinuxServer s6 init starts as root only to prepare the synthetic /config mount, then drops to UID 1000; exact add-back capabilities are bounded and verified at runtime."
+    },
+    {
+      "service": "prowlarr",
+      "image_lock_ref": "lock:prowlarr",
+      "startup_uid": 0,
+      "long_running_uid": 1000,
+      "cap_drop": [
+        "ALL"
+      ],
+      "cap_add": [
+        "CHOWN",
+        "DAC_OVERRIDE",
+        "FOWNER",
+        "SETGID",
+        "SETUID"
+      ],
+      "no_new_privileges": true,
+      "read_only_rootfs": true,
+      "writable_mounts": [
+        {
+          "target": "/config",
+          "reason": "Service configuration."
+        }
+      ],
+      "tmpfs_mounts": [
+        "/tmp"
+      ],
+      "seccomp_mode": "runtime-default",
+      "pids_limit": 128,
+      "memory_limit_mib": 512,
+      "cpu_limit": 1.0,
+      "exception_rationale": "Pinned LinuxServer s6 init starts as root only to prepare the synthetic /config mount, then drops to UID 1000; exact add-back capabilities are bounded and verified at runtime."
+    },
+    {
+      "service": "qbittorrent",
+      "image_lock_ref": "lock:qbittorrent",
+      "startup_uid": 0,
+      "long_running_uid": 1000,
+      "cap_drop": [
+        "ALL"
+      ],
+      "cap_add": [
+        "CHOWN",
+        "DAC_OVERRIDE",
+        "FOWNER",
+        "SETGID",
+        "SETUID"
+      ],
+      "no_new_privileges": true,
+      "read_only_rootfs": true,
+      "writable_mounts": [
+        {
+          "target": "/config",
+          "reason": "Service configuration."
+        },
+        {
+          "target": "/data/downloads",
+          "reason": "Synthetic download workspace."
+        }
+      ],
+      "tmpfs_mounts": [
+        "/tmp"
+      ],
+      "seccomp_mode": "runtime-default",
+      "pids_limit": 256,
+      "memory_limit_mib": 512,
+      "cpu_limit": 1.0,
+      "exception_rationale": "Pinned LinuxServer s6 init starts as root only to prepare the synthetic /config mount, then drops to UID 1000; exact add-back capabilities are bounded and verified at runtime."
+    },
+    {
+      "service": "jellyfin",
+      "image_lock_ref": "lock:jellyfin",
+      "startup_uid": 65532,
+      "long_running_uid": 65532,
+      "cap_drop": [
+        "ALL"
+      ],
+      "cap_add": [],
+      "no_new_privileges": true,
+      "read_only_rootfs": true,
+      "writable_mounts": [
+        {
+          "target": "/config",
+          "reason": "Service configuration."
+        },
+        {
+          "target": "/cache",
+          "reason": "Synthetic transcode and metadata cache."
+        }
+      ],
+      "tmpfs_mounts": [
+        "/tmp"
+      ],
+      "seccomp_mode": "runtime-default",
+      "pids_limit": 256,
+      "memory_limit_mib": 1024,
+      "cpu_limit": 2.0,
+      "exception_rationale": null
+    },
+    {
+      "service": "lab-controller",
+      "image_lock_ref": "lock:controller-base",
+      "startup_uid": 65532,
+      "long_running_uid": 65532,
+      "cap_drop": [
+        "ALL"
+      ],
+      "cap_add": [],
+      "no_new_privileges": true,
+      "read_only_rootfs": true,
+      "writable_mounts": [],
+      "tmpfs_mounts": [
+        "/tmp"
+      ],
+      "seccomp_mode": "runtime-default",
+      "pids_limit": 64,
+      "memory_limit_mib": 128,
+      "cpu_limit": 0.5,
+      "exception_rationale": null
+    },
+    {
+      "service": "arrctl-runner",
+      "image_lock_ref": "lock:controller-base",
+      "startup_uid": 65532,
+      "long_running_uid": 65532,
+      "cap_drop": [
+        "ALL"
+      ],
+      "cap_add": [],
+      "no_new_privileges": true,
+      "read_only_rootfs": true,
+      "writable_mounts": [],
+      "tmpfs_mounts": [
+        "/tmp"
+      ],
+      "seccomp_mode": "runtime-default",
+      "pids_limit": 64,
+      "memory_limit_mib": 128,
+      "cpu_limit": 0.5,
+      "exception_rationale": null
+    },
+    {
+      "service": "mock-indexer",
+      "image_lock_ref": "lock:mock-indexer-base",
+      "startup_uid": 65532,
+      "long_running_uid": 65532,
+      "cap_drop": [
+        "ALL"
+      ],
+      "cap_add": [],
+      "no_new_privileges": true,
+      "read_only_rootfs": true,
+      "writable_mounts": [],
+      "tmpfs_mounts": [
+        "/tmp"
+      ],
+      "seccomp_mode": "runtime-default",
+      "pids_limit": 128,
+      "memory_limit_mib": 512,
+      "cpu_limit": 1.0,
+      "exception_rationale": null
+    },
+    {
+      "service": "fault-api",
+      "image_lock_ref": "lock:fault-api-base",
+      "startup_uid": 65532,
+      "long_running_uid": 65532,
+      "cap_drop": [
+        "ALL"
+      ],
+      "cap_add": [],
+      "no_new_privileges": true,
+      "read_only_rootfs": true,
+      "writable_mounts": [],
+      "tmpfs_mounts": [
+        "/tmp"
+      ],
+      "seccomp_mode": "runtime-default",
+      "pids_limit": 128,
+      "memory_limit_mib": 512,
+      "cpu_limit": 1.0,
+      "exception_rationale": null
+    }
+  ]
+}

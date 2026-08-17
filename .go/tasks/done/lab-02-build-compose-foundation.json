@@ -1,0 +1,117 @@
+{
+  "schema": "go-workflow.repo-local.task.v1",
+  "kind": "task",
+  "execution_mode": "agent",
+  "shareable_delivery": "none",
+  "id": "lab-02-build-compose-foundation",
+  "project": "arr-orchestrator",
+  "status": "done",
+  "summary": "Build the isolated Compose lab foundation",
+  "description": "Build the pinned Compose topology, controller/runner image, image lock, readiness matrix, security matrix, host wrapper, and network-isolation contract without starting unseeded real services.",
+  "scope": {
+    "read": [
+      "docs/local-lab.md",
+      "docs/security-model.md",
+      "schemas/lab-*.schema.json",
+      "pyproject.toml",
+      "src/**",
+      "scripts/**",
+      "AGENTS.md",
+      ".go/project.json",
+      ".go/vision.json",
+      ".go/architecture-principles.json",
+      "docs/architecture.md",
+      ".go/tasks/done/lab-01-define-local-stack-contract.json"
+    ],
+    "modify": [
+      ".dockerignore",
+      "lab/compose.yaml",
+      "lab/Dockerfile.controller",
+      "lab/images.lock.json",
+      "lab/readiness.json",
+      "lab/security-matrix.json",
+      "scripts/lab.py",
+      "tests/lab/test_compose_contract.py"
+    ]
+  },
+  "acceptance": [
+    "Rendered MVP Compose publishes zero host ports and attaches every application service only to an internal bridge with isolated gateway mode.",
+    "Every image reference and Dockerfile base is platform-specific and pinned by immutable digest with provenance metadata.",
+    "No service is privileged or mounts the Docker socket; controller and runner are non-root, capability-free, no-new-privileges, and read-only-root with explicit writable mounts only.",
+    "Build contexts exclude Git, workflow state, plans, credentials, runtime state, evidence, caches, media, and downloads.",
+    "Only the controller isolation probe starts; real Sonarr, Radarr, Prowlarr, qBittorrent, and Jellyfin processes remain stopped until lab-04.",
+    "Negative probes prove no host/API exposure, LAN/internet reachability, or Docker authority."
+  ],
+  "verification": [
+    "docker compose -f lab/compose.yaml config --quiet",
+    "python3 -m unittest tests.lab.test_compose_contract",
+    "python3 scripts/lab.py test isolation",
+    "bash scripts/check.sh"
+  ],
+  "claim": {
+    "agent": "hermes",
+    "claimed_at": "2026-08-17T09:47:27+02:00"
+  },
+  "work_status": "completed",
+  "review_status": "approved",
+  "review_history": [
+    {
+      "created_at": "2026-08-17T11:02:01+02:00",
+      "agent": "hermes",
+      "status": "approved",
+      "evidence": "Independent Verdict A on exact hash cd72c2455766d818de3f648b17cce33fb516c9feaa1ec29467b10580c6ab1d0c; exact eight-file build context; 9 task tests; live isolation and resource readback green; no blockers.",
+      "transaction_id": "ec2cd86d1f9c4123a3208de5d9fc5f4d"
+    }
+  ],
+  "evidence": [
+    {
+      "schema": "go-workflow.finish-evidence.v1",
+      "created_at": "2026-08-17T11:02:00+02:00",
+      "task_id": "lab-02-build-compose-foundation",
+      "agent": "hermes",
+      "summary": "changed_files=.dockerignore,lab/Dockerfile.controller,lab/compose.yaml,lab/images.lock.json,lab/readiness.json,lab/security-matrix.json,scripts/lab.py,tests/lab/test_compose_contract.py; verification_command=docker compose config plus 9 compose tests plus live isolation plus full relevant unittest discovery plus scripts/check.sh plus git diff --check plus ./go validate plus live registry digest verification; verification_result=passed: exact 8-file build context, 67 relevant tests, live isolation blocked default route host host.docker.internal and internet, zero real services, zero ports, zero containers networks volumes quarantines; critic=Independent Verdict A exact hash cd72c2455766d818de3f648b17cce33fb516c9feaa1ec29467b10580c6ab1d0c",
+      "changed_files": [
+        ".dockerignore",
+        "lab/Dockerfile.controller",
+        "lab/compose.yaml",
+        "lab/images.lock.json",
+        "lab/readiness.json",
+        "lab/security-matrix.json",
+        "scripts/lab.py",
+        "tests/lab/test_compose_contract.py"
+      ],
+      "no_diff": false,
+      "verification": {
+        "command": "docker compose config plus 9 compose tests plus live isolation plus full relevant unittest discovery plus scripts/check.sh plus git diff --check plus ./go validate plus live registry digest verification",
+        "result": "passed: exact 8-file build context, 67 relevant tests, live isolation blocked default route host host.docker.internal and internet, zero real services, zero ports, zero containers networks volumes quarantines"
+      },
+      "runtime": {
+        "agent": "hermes",
+        "runtime": null,
+        "model": null,
+        "billing_mode": "unknown"
+      },
+      "usage": {
+        "schema": "go-workflow.usage-attribution.v1",
+        "runtime_kind": "unknown",
+        "billing_mode": "unknown",
+        "owner": "hermes",
+        "model": null,
+        "token_estimate": null,
+        "api_equivalent_cost_usd": null,
+        "provider_invoice_cost_usd": null,
+        "cost_label": "api_equivalent_not_invoice_cost"
+      },
+      "review": {
+        "outcome": "Independent Verdict A exact hash cd72c2455766d818de3f648b17cce33fb516c9feaa1ec29467b10580c6ab1d0c",
+        "skip_reason": null
+      }
+    }
+  ],
+  "depends_on": [
+    "lab-01-define-local-stack-contract"
+  ],
+  "priority": 5,
+  "delivery": "lab_foundation",
+  "order": 5
+}

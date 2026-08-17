@@ -1,0 +1,143 @@
+{
+  "contract_version": "1.0.0",
+  "artifact_kind": "lab_images_lock",
+  "platform": "linux/amd64",
+  "images": [
+    {
+      "service": "sonarr",
+      "registry": "lscr.io",
+      "repository": "linuxserver/sonarr",
+      "tag": "version-4.0.19.2979",
+      "index_digest": "sha256:373159ba768e23a3a1c497d9f2b936addf8fd5b1fdce7dd6a14080ac928bfda0",
+      "manifest_digest": "sha256:729b8f38d99b3af0c02bbb778f2184ed426676ecaad1fa87d12fb5347e36892a",
+      "config_digest": "sha256:de227c8e8683b49316e91ee85b8af32a3cccd7345be1178cba065f546fe8cebd",
+      "application_version": "4.0.19.2979-ls321",
+      "provenance_url": "https://github.com/linuxserver/docker-sonarr/commit/6739b822f197d546467e65acdbd7755e6981a7bd",
+      "license_url": "https://github.com/linuxserver/docker-sonarr/blob/master/LICENSE",
+      "verified_at": "2026-08-17T07:54:38Z",
+      "attestation": {
+        "status": "unavailable",
+        "limitation": "Registry provenance attestations exist, but no trusted signature policy is configured yet."
+      }
+    },
+    {
+      "service": "radarr",
+      "registry": "lscr.io",
+      "repository": "linuxserver/radarr",
+      "tag": "version-6.3.0.10514",
+      "index_digest": "sha256:a45b5ab0f850f39edb4cc9c95bbd967b52ddc3d4574a4dfb45561177db6c88f4",
+      "manifest_digest": "sha256:263be1036419fcb38fc1cf76be90db8db4b0dc49fd492617b17cc58e9e0bf1b5",
+      "config_digest": "sha256:5a29acd9cee5afd4ef094d9d62297454b2c3b759478381aeb4fe89d93577c9c7",
+      "application_version": "6.3.0.10514-ls313",
+      "provenance_url": "https://github.com/linuxserver/docker-radarr/commit/b8e3a21dae7a54d6521f71c63a88e6f4cd977ac1",
+      "license_url": "https://github.com/linuxserver/docker-radarr/blob/master/LICENSE",
+      "verified_at": "2026-08-17T07:54:38Z",
+      "attestation": {
+        "status": "unavailable",
+        "limitation": "Registry provenance attestations exist, but no trusted signature policy is configured yet."
+      }
+    },
+    {
+      "service": "prowlarr",
+      "registry": "lscr.io",
+      "repository": "linuxserver/prowlarr",
+      "tag": "version-2.5.2.5491",
+      "index_digest": "sha256:1295cff29d10b486c0d8324d1559a552140a5932bf8b3d87e398654414f63f92",
+      "manifest_digest": "sha256:fc10055b0fbda44b7d75a68ba9a336e378cd8dcec49809f24e8a1cad7bb97b49",
+      "config_digest": "sha256:8a997fafa68e82ff7c5b6c52c3e327b52c83a4f482b6416e1028a92994b35cae",
+      "application_version": "2.5.2.5491-ls156",
+      "provenance_url": "https://github.com/linuxserver/docker-prowlarr/commit/6bfe1c59dc7c8288b34a13d01c7f50c6b8e1d6d4",
+      "license_url": "https://github.com/linuxserver/docker-prowlarr/blob/master/LICENSE",
+      "verified_at": "2026-08-17T07:54:38Z",
+      "attestation": {
+        "status": "unavailable",
+        "limitation": "Registry provenance attestations exist, but no trusted signature policy is configured yet."
+      }
+    },
+    {
+      "service": "qbittorrent",
+      "registry": "lscr.io",
+      "repository": "linuxserver/qbittorrent",
+      "tag": "version-5.2.3_v2.0.14",
+      "index_digest": "sha256:212b86dff59e3962b4082b5ef20a577e76c8f8527d2ab505cfa887b4bcecb0b0",
+      "manifest_digest": "sha256:5889d4df956636ea174946efa58921aba7526077a784980d18daf283a310e784",
+      "config_digest": "sha256:4955f276f81a5f0efa8323c34203403bd5f26b4a3fb20fce80c06697291b00d1",
+      "application_version": "5.2.3_v2.0.14-ls472",
+      "provenance_url": "https://github.com/linuxserver/docker-qbittorrent/commit/a5e5b16183a7b03a090c42ba531b9f43944d0b70",
+      "license_url": "https://github.com/linuxserver/docker-qbittorrent/blob/master/LICENSE",
+      "verified_at": "2026-08-17T07:54:38Z",
+      "attestation": {
+        "status": "unavailable",
+        "limitation": "Registry provenance attestations exist, but no trusted signature policy is configured yet."
+      }
+    },
+    {
+      "service": "jellyfin",
+      "registry": "docker.io",
+      "repository": "jellyfin/jellyfin",
+      "tag": "10.11.11",
+      "index_digest": "sha256:aefb67e6a7ff1debdd154a78a7bbb780fd0c873d8639210a7f6a2016ad2b35db",
+      "manifest_digest": "sha256:0b901391a662862eddb5dc55d244d7883cbb6236ef5b9a6ea82abc78a89819f0",
+      "config_digest": "sha256:d57d4a0c18b3e51b913bd2f8f0f122eb7c7150ea37bb0e352df9cb329de11d24",
+      "application_version": "10.11.11",
+      "provenance_url": "https://github.com/jellyfin/jellyfin/releases/tag/v10.11.11",
+      "license_url": "https://github.com/jellyfin/jellyfin/blob/master/LICENSE",
+      "verified_at": "2026-08-17T07:54:38Z",
+      "attestation": {
+        "status": "unavailable",
+        "limitation": "The official image is digest-pinned, but no trusted signature policy is configured yet."
+      }
+    },
+    {
+      "service": "controller-base",
+      "registry": "docker.io",
+      "repository": "library/python",
+      "tag": "3.13.14-slim-bookworm",
+      "index_digest": "sha256:67a1e1f215ccda113cfc024e8639049257e88f273898f595b61476d128d387e8",
+      "manifest_digest": "sha256:de572b33eae61a53675a87bbd02b5e365df7b6b2b06c9276124e965cec08c452",
+      "config_digest": "sha256:9f7eb69ffb7c56da670eff50e11317105b75d32af1bd878d1b4207514377aef7",
+      "application_version": "3.13.14",
+      "provenance_url": "https://github.com/docker-library/python/commit/f79aea5b8f6b2d65b31ba2bb3f69c0c2083345c8",
+      "license_url": "https://docs.python.org/3/license.html",
+      "verified_at": "2026-08-17T07:54:38Z",
+      "attestation": {
+        "status": "unavailable",
+        "limitation": "Official-image provenance exists, but no trusted signature policy is configured yet."
+      }
+    },
+    {
+      "service": "mock-indexer-base",
+      "registry": "docker.io",
+      "repository": "library/python",
+      "tag": "3.13.14-slim-bookworm",
+      "index_digest": "sha256:67a1e1f215ccda113cfc024e8639049257e88f273898f595b61476d128d387e8",
+      "manifest_digest": "sha256:de572b33eae61a53675a87bbd02b5e365df7b6b2b06c9276124e965cec08c452",
+      "config_digest": "sha256:9f7eb69ffb7c56da670eff50e11317105b75d32af1bd878d1b4207514377aef7",
+      "application_version": "3.13.14",
+      "provenance_url": "https://github.com/docker-library/python/commit/f79aea5b8f6b2d65b31ba2bb3f69c0c2083345c8",
+      "license_url": "https://docs.python.org/3/license.html",
+      "verified_at": "2026-08-17T07:54:38Z",
+      "attestation": {
+        "status": "unavailable",
+        "limitation": "Official-image provenance exists, but no trusted signature policy is configured yet."
+      }
+    },
+    {
+      "service": "fault-api-base",
+      "registry": "docker.io",
+      "repository": "library/python",
+      "tag": "3.13.14-slim-bookworm",
+      "index_digest": "sha256:67a1e1f215ccda113cfc024e8639049257e88f273898f595b61476d128d387e8",
+      "manifest_digest": "sha256:de572b33eae61a53675a87bbd02b5e365df7b6b2b06c9276124e965cec08c452",
+      "config_digest": "sha256:9f7eb69ffb7c56da670eff50e11317105b75d32af1bd878d1b4207514377aef7",
+      "application_version": "3.13.14",
+      "provenance_url": "https://github.com/docker-library/python/commit/f79aea5b8f6b2d65b31ba2bb3f69c0c2083345c8",
+      "license_url": "https://docs.python.org/3/license.html",
+      "verified_at": "2026-08-17T07:54:38Z",
+      "attestation": {
+        "status": "unavailable",
+        "limitation": "Official-image provenance exists, but no trusted signature policy is configured yet."
+      }
+    }
+  ]
+}

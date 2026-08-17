@@ -1,0 +1,636 @@
+{
+  "contract_version": "1.0.0",
+  "artifact_kind": "lab_readiness",
+  "services": {
+    "sonarr": {
+      "image_ref": "lock:sonarr",
+      "states": {
+        "process_alive": {
+          "owner": "docker",
+          "probe_location": "in_container",
+          "probe": {
+            "kind": "process",
+            "target": "main"
+          },
+          "start_period_seconds": 2,
+          "interval_seconds": 2,
+          "max_attempts": 15,
+          "hard_deadline_seconds": 35
+        },
+        "api_live": {
+          "owner": "docker",
+          "probe_location": "in_container",
+          "probe": {
+            "kind": "http",
+            "method": "GET",
+            "path": "/ping",
+            "expected_status": [
+              200
+            ]
+          },
+          "start_period_seconds": 10,
+          "interval_seconds": 5,
+          "max_attempts": 12,
+          "hard_deadline_seconds": 70
+        },
+        "api_ready": {
+          "owner": "controller",
+          "probe_location": "lab_controller",
+          "probe": {
+            "kind": "http",
+            "method": "GET",
+            "path": "/api/v3/system/status",
+            "expected_status": [
+              200
+            ]
+          },
+          "start_period_seconds": 2,
+          "interval_seconds": 2,
+          "max_attempts": 30,
+          "hard_deadline_seconds": 70,
+          "credential_ref": "file:/run/secrets/sonarr-credential",
+          "expected_schema_ref": "schema:sonarr-status"
+        },
+        "baseline_verified": {
+          "owner": "controller",
+          "probe_location": "lab_controller",
+          "probe": {
+            "kind": "http",
+            "method": "GET",
+            "path": "/api/v3/rootfolder",
+            "expected_status": [
+              200
+            ]
+          },
+          "start_period_seconds": 2,
+          "interval_seconds": 2,
+          "max_attempts": 30,
+          "hard_deadline_seconds": 70,
+          "credential_ref": "file:/run/secrets/sonarr-credential",
+          "expected_schema_ref": "schema:sonarr-baseline",
+          "expected_baseline_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000001"
+        }
+      }
+    },
+    "radarr": {
+      "image_ref": "lock:radarr",
+      "states": {
+        "process_alive": {
+          "owner": "docker",
+          "probe_location": "in_container",
+          "probe": {
+            "kind": "process",
+            "target": "main"
+          },
+          "start_period_seconds": 2,
+          "interval_seconds": 2,
+          "max_attempts": 15,
+          "hard_deadline_seconds": 35
+        },
+        "api_live": {
+          "owner": "docker",
+          "probe_location": "in_container",
+          "probe": {
+            "kind": "http",
+            "method": "GET",
+            "path": "/ping",
+            "expected_status": [
+              200
+            ]
+          },
+          "start_period_seconds": 10,
+          "interval_seconds": 5,
+          "max_attempts": 12,
+          "hard_deadline_seconds": 70
+        },
+        "api_ready": {
+          "owner": "controller",
+          "probe_location": "lab_controller",
+          "probe": {
+            "kind": "http",
+            "method": "GET",
+            "path": "/api/v3/system/status",
+            "expected_status": [
+              200
+            ]
+          },
+          "start_period_seconds": 2,
+          "interval_seconds": 2,
+          "max_attempts": 30,
+          "hard_deadline_seconds": 70,
+          "credential_ref": "file:/run/secrets/radarr-credential",
+          "expected_schema_ref": "schema:radarr-status"
+        },
+        "baseline_verified": {
+          "owner": "controller",
+          "probe_location": "lab_controller",
+          "probe": {
+            "kind": "http",
+            "method": "GET",
+            "path": "/api/v3/rootfolder",
+            "expected_status": [
+              200
+            ]
+          },
+          "start_period_seconds": 2,
+          "interval_seconds": 2,
+          "max_attempts": 30,
+          "hard_deadline_seconds": 70,
+          "credential_ref": "file:/run/secrets/radarr-credential",
+          "expected_schema_ref": "schema:radarr-baseline",
+          "expected_baseline_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000002"
+        }
+      }
+    },
+    "prowlarr": {
+      "image_ref": "lock:prowlarr",
+      "states": {
+        "process_alive": {
+          "owner": "docker",
+          "probe_location": "in_container",
+          "probe": {
+            "kind": "process",
+            "target": "main"
+          },
+          "start_period_seconds": 2,
+          "interval_seconds": 2,
+          "max_attempts": 15,
+          "hard_deadline_seconds": 35
+        },
+        "api_live": {
+          "owner": "docker",
+          "probe_location": "in_container",
+          "probe": {
+            "kind": "http",
+            "method": "GET",
+            "path": "/ping",
+            "expected_status": [
+              200
+            ]
+          },
+          "start_period_seconds": 10,
+          "interval_seconds": 5,
+          "max_attempts": 12,
+          "hard_deadline_seconds": 70
+        },
+        "api_ready": {
+          "owner": "controller",
+          "probe_location": "lab_controller",
+          "probe": {
+            "kind": "http",
+            "method": "GET",
+            "path": "/api/v1/system/status",
+            "expected_status": [
+              200
+            ]
+          },
+          "start_period_seconds": 2,
+          "interval_seconds": 2,
+          "max_attempts": 30,
+          "hard_deadline_seconds": 70,
+          "credential_ref": "file:/run/secrets/prowlarr-credential",
+          "expected_schema_ref": "schema:prowlarr-status"
+        },
+        "baseline_verified": {
+          "owner": "controller",
+          "probe_location": "lab_controller",
+          "probe": {
+            "kind": "http",
+            "method": "GET",
+            "path": "/api/v1/indexer",
+            "expected_status": [
+              200
+            ]
+          },
+          "start_period_seconds": 2,
+          "interval_seconds": 2,
+          "max_attempts": 30,
+          "hard_deadline_seconds": 70,
+          "credential_ref": "file:/run/secrets/prowlarr-credential",
+          "expected_schema_ref": "schema:prowlarr-baseline",
+          "expected_baseline_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000003"
+        }
+      }
+    },
+    "qbittorrent": {
+      "image_ref": "lock:qbittorrent",
+      "states": {
+        "process_alive": {
+          "owner": "docker",
+          "probe_location": "in_container",
+          "probe": {
+            "kind": "process",
+            "target": "main"
+          },
+          "start_period_seconds": 2,
+          "interval_seconds": 2,
+          "max_attempts": 15,
+          "hard_deadline_seconds": 35
+        },
+        "api_live": {
+          "owner": "docker",
+          "probe_location": "in_container",
+          "probe": {
+            "kind": "http",
+            "method": "GET",
+            "path": "/",
+            "expected_status": [
+              200
+            ]
+          },
+          "start_period_seconds": 10,
+          "interval_seconds": 5,
+          "max_attempts": 12,
+          "hard_deadline_seconds": 70
+        },
+        "api_ready": {
+          "owner": "controller",
+          "probe_location": "lab_controller",
+          "probe": {
+            "kind": "http",
+            "method": "GET",
+            "path": "/api/v2/app/version",
+            "expected_status": [
+              200
+            ]
+          },
+          "start_period_seconds": 2,
+          "interval_seconds": 2,
+          "max_attempts": 30,
+          "hard_deadline_seconds": 70,
+          "credential_ref": "file:/run/secrets/qbittorrent-credential",
+          "expected_schema_ref": "schema:qbittorrent-status"
+        },
+        "baseline_verified": {
+          "owner": "controller",
+          "probe_location": "lab_controller",
+          "probe": {
+            "kind": "http",
+            "method": "GET",
+            "path": "/api/v2/torrents/categories",
+            "expected_status": [
+              200
+            ]
+          },
+          "start_period_seconds": 2,
+          "interval_seconds": 2,
+          "max_attempts": 30,
+          "hard_deadline_seconds": 70,
+          "credential_ref": "file:/run/secrets/qbittorrent-credential",
+          "expected_schema_ref": "schema:qbittorrent-baseline",
+          "expected_baseline_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000004"
+        }
+      }
+    },
+    "jellyfin": {
+      "image_ref": "lock:jellyfin",
+      "states": {
+        "process_alive": {
+          "owner": "docker",
+          "probe_location": "in_container",
+          "probe": {
+            "kind": "process",
+            "target": "main"
+          },
+          "start_period_seconds": 2,
+          "interval_seconds": 2,
+          "max_attempts": 15,
+          "hard_deadline_seconds": 35
+        },
+        "api_live": {
+          "owner": "docker",
+          "probe_location": "in_container",
+          "probe": {
+            "kind": "http",
+            "method": "GET",
+            "path": "/health",
+            "expected_status": [
+              200
+            ]
+          },
+          "start_period_seconds": 10,
+          "interval_seconds": 5,
+          "max_attempts": 12,
+          "hard_deadline_seconds": 70
+        },
+        "api_ready": {
+          "owner": "controller",
+          "probe_location": "lab_controller",
+          "probe": {
+            "kind": "http",
+            "method": "GET",
+            "path": "/System/Info",
+            "expected_status": [
+              200
+            ]
+          },
+          "start_period_seconds": 2,
+          "interval_seconds": 2,
+          "max_attempts": 30,
+          "hard_deadline_seconds": 70,
+          "credential_ref": "file:/run/secrets/jellyfin-credential",
+          "expected_schema_ref": "schema:jellyfin-status"
+        },
+        "baseline_verified": {
+          "owner": "controller",
+          "probe_location": "lab_controller",
+          "probe": {
+            "kind": "http",
+            "method": "GET",
+            "path": "/Library/VirtualFolders",
+            "expected_status": [
+              200
+            ]
+          },
+          "start_period_seconds": 2,
+          "interval_seconds": 2,
+          "max_attempts": 30,
+          "hard_deadline_seconds": 70,
+          "credential_ref": "file:/run/secrets/jellyfin-credential",
+          "expected_schema_ref": "schema:jellyfin-baseline",
+          "expected_baseline_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000005"
+        }
+      }
+    },
+    "lab-controller": {
+      "image_ref": "lock:controller-base",
+      "states": {
+        "process_alive": {
+          "owner": "docker",
+          "probe_location": "in_container",
+          "probe": {
+            "kind": "process",
+            "target": "main"
+          },
+          "start_period_seconds": 2,
+          "interval_seconds": 2,
+          "max_attempts": 15,
+          "hard_deadline_seconds": 35
+        },
+        "api_live": {
+          "owner": "docker",
+          "probe_location": "in_container",
+          "probe": {
+            "kind": "http",
+            "method": "GET",
+            "path": "/health/live",
+            "expected_status": [
+              200
+            ]
+          },
+          "start_period_seconds": 2,
+          "interval_seconds": 2,
+          "max_attempts": 15,
+          "hard_deadline_seconds": 35
+        },
+        "api_ready": {
+          "owner": "controller",
+          "probe_location": "lab_controller",
+          "probe": {
+            "kind": "http",
+            "method": "GET",
+            "path": "/health/ready",
+            "expected_status": [
+              200
+            ]
+          },
+          "start_period_seconds": 2,
+          "interval_seconds": 2,
+          "max_attempts": 30,
+          "hard_deadline_seconds": 70,
+          "credential_ref": "file:/run/secrets/lab-controller-credential",
+          "expected_schema_ref": "schema:lab-controller-status"
+        },
+        "baseline_verified": {
+          "owner": "controller",
+          "probe_location": "lab_controller",
+          "probe": {
+            "kind": "http",
+            "method": "GET",
+            "path": "/baseline",
+            "expected_status": [
+              200
+            ]
+          },
+          "start_period_seconds": 2,
+          "interval_seconds": 2,
+          "max_attempts": 30,
+          "hard_deadline_seconds": 70,
+          "credential_ref": "file:/run/secrets/lab-controller-credential",
+          "expected_schema_ref": "schema:lab-controller-baseline",
+          "expected_baseline_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000006"
+        }
+      }
+    },
+    "arrctl-runner": {
+      "image_ref": "lock:controller-base",
+      "states": {
+        "process_alive": {
+          "owner": "docker",
+          "probe_location": "in_container",
+          "probe": {
+            "kind": "process",
+            "target": "main"
+          },
+          "start_period_seconds": 2,
+          "interval_seconds": 2,
+          "max_attempts": 15,
+          "hard_deadline_seconds": 35
+        },
+        "api_live": {
+          "owner": "docker",
+          "probe_location": "in_container",
+          "probe": {
+            "kind": "http",
+            "method": "GET",
+            "path": "/health/live",
+            "expected_status": [
+              200
+            ]
+          },
+          "start_period_seconds": 2,
+          "interval_seconds": 2,
+          "max_attempts": 15,
+          "hard_deadline_seconds": 35
+        },
+        "api_ready": {
+          "owner": "controller",
+          "probe_location": "lab_controller",
+          "probe": {
+            "kind": "http",
+            "method": "GET",
+            "path": "/health/ready",
+            "expected_status": [
+              200
+            ]
+          },
+          "start_period_seconds": 2,
+          "interval_seconds": 2,
+          "max_attempts": 30,
+          "hard_deadline_seconds": 70,
+          "credential_ref": "file:/run/secrets/arrctl-runner-credential",
+          "expected_schema_ref": "schema:arrctl-runner-status"
+        },
+        "baseline_verified": {
+          "owner": "controller",
+          "probe_location": "lab_controller",
+          "probe": {
+            "kind": "http",
+            "method": "GET",
+            "path": "/baseline",
+            "expected_status": [
+              200
+            ]
+          },
+          "start_period_seconds": 2,
+          "interval_seconds": 2,
+          "max_attempts": 30,
+          "hard_deadline_seconds": 70,
+          "credential_ref": "file:/run/secrets/arrctl-runner-credential",
+          "expected_schema_ref": "schema:arrctl-runner-baseline",
+          "expected_baseline_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000007"
+        }
+      }
+    },
+    "mock-indexer": {
+      "image_ref": "lock:mock-indexer-base",
+      "states": {
+        "process_alive": {
+          "owner": "docker",
+          "probe_location": "in_container",
+          "probe": {
+            "kind": "process",
+            "target": "main"
+          },
+          "start_period_seconds": 2,
+          "interval_seconds": 2,
+          "max_attempts": 15,
+          "hard_deadline_seconds": 35
+        },
+        "api_live": {
+          "owner": "docker",
+          "probe_location": "in_container",
+          "probe": {
+            "kind": "http",
+            "method": "GET",
+            "path": "/health/live",
+            "expected_status": [
+              200
+            ]
+          },
+          "start_period_seconds": 2,
+          "interval_seconds": 2,
+          "max_attempts": 30,
+          "hard_deadline_seconds": 70
+        },
+        "api_ready": {
+          "owner": "controller",
+          "probe_location": "lab_controller",
+          "probe": {
+            "kind": "http",
+            "method": "GET",
+            "path": "/health/ready",
+            "expected_status": [
+              200
+            ]
+          },
+          "start_period_seconds": 2,
+          "interval_seconds": 2,
+          "max_attempts": 30,
+          "hard_deadline_seconds": 70,
+          "credential_ref": "file:/run/secrets/mock-indexer-credential",
+          "expected_schema_ref": "schema:mock-indexer-status"
+        },
+        "baseline_verified": {
+          "owner": "controller",
+          "probe_location": "lab_controller",
+          "probe": {
+            "kind": "http",
+            "method": "GET",
+            "path": "/baseline",
+            "expected_status": [
+              200
+            ]
+          },
+          "start_period_seconds": 2,
+          "interval_seconds": 2,
+          "max_attempts": 30,
+          "hard_deadline_seconds": 70,
+          "credential_ref": "file:/run/secrets/mock-indexer-credential",
+          "expected_schema_ref": "schema:mock-indexer-baseline",
+          "expected_baseline_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000008"
+        }
+      }
+    },
+    "fault-api": {
+      "image_ref": "lock:fault-api-base",
+      "states": {
+        "process_alive": {
+          "owner": "docker",
+          "probe_location": "in_container",
+          "probe": {
+            "kind": "process",
+            "target": "main"
+          },
+          "start_period_seconds": 2,
+          "interval_seconds": 2,
+          "max_attempts": 15,
+          "hard_deadline_seconds": 35
+        },
+        "api_live": {
+          "owner": "docker",
+          "probe_location": "in_container",
+          "probe": {
+            "kind": "http",
+            "method": "GET",
+            "path": "/health/live",
+            "expected_status": [
+              200
+            ]
+          },
+          "start_period_seconds": 2,
+          "interval_seconds": 2,
+          "max_attempts": 30,
+          "hard_deadline_seconds": 70
+        },
+        "api_ready": {
+          "owner": "controller",
+          "probe_location": "lab_controller",
+          "probe": {
+            "kind": "http",
+            "method": "GET",
+            "path": "/health/ready",
+            "expected_status": [
+              200
+            ]
+          },
+          "start_period_seconds": 2,
+          "interval_seconds": 2,
+          "max_attempts": 30,
+          "hard_deadline_seconds": 70,
+          "credential_ref": "file:/run/secrets/fault-api-credential",
+          "expected_schema_ref": "schema:fault-api-status"
+        },
+        "baseline_verified": {
+          "owner": "controller",
+          "probe_location": "lab_controller",
+          "probe": {
+            "kind": "http",
+            "method": "GET",
+            "path": "/baseline",
+            "expected_status": [
+              200
+            ]
+          },
+          "start_period_seconds": 2,
+          "interval_seconds": 2,
+          "max_attempts": 30,
+          "hard_deadline_seconds": 70,
+          "credential_ref": "file:/run/secrets/fault-api-credential",
+          "expected_schema_ref": "schema:fault-api-baseline",
+          "expected_baseline_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000009"
+        }
+      }
+    }
+  }
+}

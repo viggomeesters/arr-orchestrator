@@ -1,0 +1,221 @@
+x-lab-labels: &lab-labels
+  com.viggomeesters.arr-orchestrator.lab: "true"
+  com.viggomeesters.arr-orchestrator.lab-id: "${ARR_LAB_ID:-unconfigured}"
+
+x-common-security: &common-security
+  privileged: false
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  read_only: true
+  restart: "no"
+  networks:
+    - private
+
+x-linuxserver-environment: &linuxserver-environment
+  PUID: "1000"
+  PGID: "1000"
+  TZ: Etc/UTC
+  UMASK: "022"
+
+services:
+  sonarr:
+    <<: *common-security
+    image: lscr.io/linuxserver/sonarr:version-4.0.19.2979@sha256:729b8f38d99b3af0c02bbb778f2184ed426676ecaad1fa87d12fb5347e36892a
+    platform: linux/amd64
+    profiles: [services]
+    labels: *lab-labels
+    environment: *linuxserver-environment
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 1.0
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+    volumes:
+      - type: bind
+        source: "${ARR_LAB_ROOT:-/var/empty/arr-orchestrator-lab}/config/sonarr"
+        target: /config
+      - type: bind
+        source: "${ARR_LAB_ROOT:-/var/empty/arr-orchestrator-lab}/data/media/tv"
+        target: /data/media/tv
+      - type: bind
+        source: "${ARR_LAB_ROOT:-/var/empty/arr-orchestrator-lab}/data/downloads"
+        target: /data/downloads
+    healthcheck:
+      test: [CMD-SHELL, "curl -fsS http://127.0.0.1:8989/ping >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 2s
+      retries: 12
+      start_period: 10s
+
+  radarr:
+    <<: *common-security
+    image: lscr.io/linuxserver/radarr:version-6.3.0.10514@sha256:263be1036419fcb38fc1cf76be90db8db4b0dc49fd492617b17cc58e9e0bf1b5
+    platform: linux/amd64
+    profiles: [services]
+    labels: *lab-labels
+    environment: *linuxserver-environment
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 1.0
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+    volumes:
+      - type: bind
+        source: "${ARR_LAB_ROOT:-/var/empty/arr-orchestrator-lab}/config/radarr"
+        target: /config
+      - type: bind
+        source: "${ARR_LAB_ROOT:-/var/empty/arr-orchestrator-lab}/data/media/movies"
+        target: /data/media/movies
+      - type: bind
+        source: "${ARR_LAB_ROOT:-/var/empty/arr-orchestrator-lab}/data/downloads"
+        target: /data/downloads
+    healthcheck:
+      test: [CMD-SHELL, "curl -fsS http://127.0.0.1:7878/ping >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 2s
+      retries: 12
+      start_period: 10s
+
+  prowlarr:
+    <<: *common-security
+    image: lscr.io/linuxserver/prowlarr:version-2.5.2.5491@sha256:fc10055b0fbda44b7d75a68ba9a336e378cd8dcec49809f24e8a1cad7bb97b49
+    platform: linux/amd64
+    profiles: [services]
+    labels: *lab-labels
+    environment: *linuxserver-environment
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 1.0
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+    volumes:
+      - type: bind
+        source: "${ARR_LAB_ROOT:-/var/empty/arr-orchestrator-lab}/config/prowlarr"
+        target: /config
+    healthcheck:
+      test: [CMD-SHELL, "curl -fsS http://127.0.0.1:9696/ping >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 2s
+      retries: 12
+      start_period: 10s
+
+  qbittorrent:
+    <<: *common-security
+    image: lscr.io/linuxserver/qbittorrent:version-5.2.3_v2.0.14@sha256:5889d4df956636ea174946efa58921aba7526077a784980d18daf283a310e784
+    platform: linux/amd64
+    profiles: [services]
+    labels: *lab-labels
+    environment:
+      <<: *linuxserver-environment
+      WEBUI_PORT: "8080"
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    pids_limit: 256
+    mem_limit: 512m
+    cpus: 1.0
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+    volumes:
+      - type: bind
+        source: "${ARR_LAB_ROOT:-/var/empty/arr-orchestrator-lab}/config/qbittorrent"
+        target: /config
+      - type: bind
+        source: "${ARR_LAB_ROOT:-/var/empty/arr-orchestrator-lab}/data/downloads"
+        target: /data/downloads
+    healthcheck:
+      test: [CMD-SHELL, "curl -fsS http://127.0.0.1:8080/ >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 2s
+      retries: 12
+      start_period: 10s
+
+  jellyfin:
+    <<: *common-security
+    image: docker.io/jellyfin/jellyfin:10.11.11@sha256:0b901391a662862eddb5dc55d244d7883cbb6236ef5b9a6ea82abc78a89819f0
+    platform: linux/amd64
+    profiles: [services]
+    labels: *lab-labels
+    user: "65532:65532"
+    pids_limit: 256
+    mem_limit: 1024m
+    cpus: 2.0
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=128m
+    volumes:
+      - type: bind
+        source: "${ARR_LAB_ROOT:-/var/empty/arr-orchestrator-lab}/config/jellyfin"
+        target: /config
+      - type: bind
+        source: "${ARR_LAB_ROOT:-/var/empty/arr-orchestrator-lab}/cache/jellyfin"
+        target: /cache
+      - type: bind
+        source: "${ARR_LAB_ROOT:-/var/empty/arr-orchestrator-lab}/data/media/tv"
+        target: /data/media/tv
+        read_only: true
+      - type: bind
+        source: "${ARR_LAB_ROOT:-/var/empty/arr-orchestrator-lab}/data/media/movies"
+        target: /data/media/movies
+        read_only: true
+    healthcheck:
+      test: [CMD-SHELL, "curl -fsS http://127.0.0.1:8096/health >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 2s
+      retries: 12
+      start_period: 10s
+
+  lab-controller:
+    <<: *common-security
+    build:
+      context: ..
+      dockerfile: lab/Dockerfile.controller
+    platform: linux/amd64
+    profiles: [isolation]
+    labels: *lab-labels
+    user: "65532:65532"
+    command: [container-health-server]
+    pids_limit: 64
+    mem_limit: 128m
+    cpus: 0.5
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=32m
+    healthcheck:
+      test: [CMD, python3, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health/live', timeout=1).read()"]
+      interval: 2s
+      timeout: 1s
+      retries: 15
+      start_period: 2s
+
+  arrctl-runner:
+    <<: *common-security
+    build:
+      context: ..
+      dockerfile: lab/Dockerfile.controller
+    platform: linux/amd64
+    profiles: [runner]
+    labels: *lab-labels
+    user: "65532:65532"
+    command: [container-health-server]
+    pids_limit: 64
+    mem_limit: 128m
+    cpus: 0.5
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=32m
+    healthcheck:
+      test: [CMD, python3, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health/live', timeout=1).read()"]
+      interval: 2s
+      timeout: 1s
+      retries: 15
+      start_period: 2s
+
+networks:
+  private:
+    name: "${COMPOSE_PROJECT_NAME}_private"
+    driver: bridge
+    internal: true
+    driver_opts:
+      com.docker.network.bridge.gateway_mode_ipv4: isolated
+    labels: *lab-labels

@@ -24,10 +24,13 @@
   "acceptance": [
     "Common operator intents map to explicit read-only or mutation authority.",
     "Destructive or ambiguous instructions stop at an explainable human gate.",
-    "Final response fixtures are concise and include evidence or a precise blocker."
+    "Final response fixtures are concise and include evidence or a precise blocker.",
+    "The Hermes command contract executes through arrctl-runner while Telegram and Hermes credentials remain outside Compose.",
+    "All returned JSON is deterministic and redacted."
   ],
   "verification": [
     "python3 -m unittest tests.integration.test_hermes_contract",
+    "python3 scripts/lab.py test hermes-contract",
     "bash scripts/check.sh"
   ],
   "claim": {
@@ -39,10 +42,9 @@
   "review_history": [],
   "evidence": [],
   "depends_on": [
-    "12-implement-end-to-end-verify",
-    "06-implement-download-client-adapter",
-    "07-implement-media-server-adapter"
+    "lab-07-prove-plan-apply-verify"
   ],
-  "priority": 13,
-  "delivery": "product_implementation_backlog"
+  "priority": 22,
+  "delivery": "product_implementation_backlog",
+  "order": 22
 }

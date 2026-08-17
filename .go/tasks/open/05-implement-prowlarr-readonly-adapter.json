@@ -18,16 +18,21 @@
       "src/arr_orchestrator/adapters/prowlarr.py",
       "tests/adapters/test_prowlarr.py",
       "tests/fixtures/prowlarr/**",
-      "docs/adapters/prowlarr.md"
+      "docs/adapters/prowlarr.md",
+      "tests/integration/test_prowlarr_lab.py"
     ]
   },
   "acceptance": [
     "Application links and sync settings normalize into the core capability model.",
     "Indexer data is summarized without persisting sensitive query or history data.",
-    "Synthetic fixtures prove success, unsupported version, and redaction behavior."
+    "Synthetic fixtures prove success, unsupported version, and redaction behavior.",
+    "The adapter reuses transport-01 for endpoint policy, credentials, retries, typed failures, and redaction rather than implementing a private HTTP stack.",
+    "Fast synthetic fixture tests and a focused real-container prowlarr lane both pass.",
+    "Read-only operation performs no domain mutation; any required authentication session is explicitly classified and side-effect-free."
   ],
   "verification": [
     "python3 -m unittest tests.adapters.test_prowlarr",
+    "python3 scripts/lab.py test adapter prowlarr",
     "bash scripts/check.sh"
   ],
   "claim": {
@@ -39,8 +44,9 @@
   "review_history": [],
   "evidence": [],
   "depends_on": [
-    "02-build-arrctl-skeleton"
+    "transport-01-build-shared-readonly-transport"
   ],
-  "priority": 5,
-  "delivery": "product_implementation_backlog"
+  "priority": 12,
+  "delivery": "product_implementation_backlog",
+  "order": 12
 }

@@ -18,16 +18,20 @@
     "modify": [
       "src/arr_orchestrator/doctor/**",
       "tests/doctor/**",
-      "docs/doctor.md"
+      "docs/doctor.md",
+      "tests/integration/test_lab_doctor.py"
     ]
   },
   "acceptance": [
     "Every finding has severity, owner, evidence references, explanation, and remediation guidance.",
     "Ambiguous path identity and unavailable filesystem evidence fail closed.",
-    "Synthetic scenarios cover healthy, partial, miswired, and hardlink-impossible stacks."
+    "Synthetic scenarios cover healthy, partial, miswired, and hardlink-impossible stacks.",
+    "The real healthy lab produces no blocker-level false positives.",
+    "Real-lab scenarios prove category, application-link, root-folder, container-path, connectivity, API-version, and actual hardlink feasibility findings."
   ],
   "verification": [
     "python3 -m unittest discover -s tests/doctor -p \"test_*.py\"",
+    "python3 scripts/lab.py test doctor",
     "bash scripts/check.sh"
   ],
   "claim": {
@@ -41,6 +45,7 @@
   "depends_on": [
     "08-implement-stack-inventory"
   ],
-  "priority": 9,
-  "delivery": "product_implementation_backlog"
+  "priority": 16,
+  "delivery": "product_implementation_backlog",
+  "order": 16
 }

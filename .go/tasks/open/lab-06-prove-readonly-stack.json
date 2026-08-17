@@ -1,0 +1,59 @@
+{
+  "schema": "go-workflow.repo-local.task.v1",
+  "kind": "task",
+  "execution_mode": "agent",
+  "shareable_delivery": "none",
+  "id": "lab-06-prove-readonly-stack",
+  "project": "arr-orchestrator",
+  "status": "open",
+  "summary": "Prove the complete read-only lab stack",
+  "description": "Act as the independent promotion gate over all five real-service adapters, normalized inventory, doctor behavior, and deterministic fault scenarios before mutation planning begins.",
+  "scope": {
+    "read": [
+      "docs/local-lab.md",
+      "docs/http-transport.md",
+      "src/arr_orchestrator/adapters/**",
+      "src/arr_orchestrator/inventory/**",
+      "src/arr_orchestrator/doctor/**",
+      "lab/**",
+      "AGENTS.md",
+      ".go/project.json",
+      ".go/vision.json",
+      ".go/architecture-principles.json",
+      "docs/architecture.md",
+      "docs/security-model.md",
+      ".go/tasks/done/09-implement-doctor-rules.json"
+    ],
+    "modify": [
+      "tests/integration/test_full_lab_inventory.py",
+      "tests/integration/test_full_lab_faults.py",
+      "docs/lab-readonly-proof.md"
+    ]
+  },
+  "acceptance": [
+    "All five services appear in one schema-valid normalized inventory with service-level evidence and uncertainty.",
+    "The complete required scenario set yields exact expected doctor finding identifiers and severities with no blocker-level healthy-baseline false positives.",
+    "Unsupported versions and unreachable services produce typed blockers.",
+    "Credentials, runtime URLs, cookies, headers, private paths, and raw service responses never enter results, logs, or committed proof.",
+    "Read-only mode performs no domain mutation except the exact side-effect-free qBittorrent auth_session POST; all other POST, PUT, PATCH, and DELETE calls remain poisoned.",
+    "Independent review passes before task 10 becomes dependency-ready."
+  ],
+  "verification": [
+    "python3 scripts/lab.py test readonly",
+    "bash scripts/check.sh"
+  ],
+  "claim": {
+    "agent": null,
+    "claimed_at": null
+  },
+  "work_status": "pending",
+  "review_status": "none",
+  "review_history": [],
+  "evidence": [],
+  "depends_on": [
+    "09-implement-doctor-rules"
+  ],
+  "priority": 17,
+  "delivery": "lab_promotion_gate",
+  "order": 17
+}

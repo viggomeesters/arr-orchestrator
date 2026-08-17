@@ -7,7 +7,7 @@
   "project": "arr-orchestrator",
   "status": "open",
   "summary": "Prove doctor to verify against a synthetic media stack",
-  "description": "Run the complete operation lifecycle against isolated synthetic service doubles and publish redacted machine-readable evidence fixtures.",
+  "description": "Run the final release gate over the complete real local container stack plus deterministic doubles: broken scenario through inventory, doctor, plan, approval, apply, API readback, verify, redacted evidence, reset, and healthy inventory.",
   "scope": {
     "read": [
       "src/**",
@@ -24,10 +24,12 @@
   "acceptance": [
     "A synthetic misconfiguration is diagnosed, planned, applied, and verified end to end.",
     "A stale-plan scenario and an unauthorized destructive scenario fail closed.",
-    "Proof artifacts contain no secrets, network identifiers, media titles, or runtime paths."
+    "Proof artifacts contain no secrets, network identifiers, media titles, or runtime paths.",
+    "The proof uses real local Sonarr, Radarr, Prowlarr, qBittorrent, and Jellyfin containers plus repository-owned deterministic doubles.",
+    "Reset leaves no matching marked resources and the rebuilt healthy inventory matches the canonical baseline."
   ],
   "verification": [
-    "python3 -m unittest discover -s tests/e2e -p \"test_*.py\"",
+    "python3 scripts/lab.py test release",
     "bash scripts/check.sh"
   ],
   "claim": {
@@ -41,6 +43,7 @@
   "depends_on": [
     "13-implement-hermes-command-contract"
   ],
-  "priority": 14,
-  "delivery": "product_implementation_backlog"
+  "priority": 23,
+  "delivery": "release_gate",
+  "order": 23
 }

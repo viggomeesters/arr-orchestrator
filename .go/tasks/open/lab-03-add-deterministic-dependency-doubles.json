@@ -1,0 +1,59 @@
+{
+  "schema": "go-workflow.repo-local.task.v1",
+  "kind": "task",
+  "execution_mode": "agent",
+  "shareable_delivery": "none",
+  "id": "lab-03-add-deterministic-dependency-doubles",
+  "project": "arr-orchestrator",
+  "status": "open",
+  "summary": "Add deterministic lab dependency doubles",
+  "description": "Create repository-owned synthetic mock-indexer and protocol-fault services for deterministic timeout, malformed-response, unsupported-version, unavailable-service, and stale-readback tests.",
+  "scope": {
+    "read": [
+      "docs/local-lab.md",
+      "lab/compose.yaml",
+      "lab/images.lock.json",
+      "lab/security-matrix.json",
+      "schemas/**",
+      "AGENTS.md",
+      ".go/project.json",
+      ".go/vision.json",
+      ".go/architecture-principles.json",
+      "docs/architecture.md",
+      "docs/security-model.md",
+      ".go/tasks/done/lab-02-build-compose-foundation.json"
+    ],
+    "modify": [
+      "lab/services/mock-indexer/**",
+      "lab/services/fault-api/**",
+      "lab/compose.yaml",
+      "tests/lab/test_service_doubles.py"
+    ]
+  },
+  "acceptance": [
+    "Responses and timing are deterministic and use only minimal synthetic fields.",
+    "Scenarios cover timeout, unavailable service, malformed JSON, unsupported API version, and stale readback.",
+    "Doubles cannot reach the internet, expose host ports, or receive Docker authority.",
+    "Logs redact headers, cookies, query parameters, and secret-like values.",
+    "Repository source contains no copied upstream UI assets, databases, media metadata, or full captured responses."
+  ],
+  "verification": [
+    "python3 -m unittest tests.lab.test_service_doubles",
+    "python3 scripts/lab.py test doubles",
+    "bash scripts/check.sh"
+  ],
+  "claim": {
+    "agent": null,
+    "claimed_at": null
+  },
+  "work_status": "pending",
+  "review_status": "none",
+  "review_history": [],
+  "evidence": [],
+  "depends_on": [
+    "lab-02-build-compose-foundation"
+  ],
+  "priority": 6,
+  "delivery": "lab_foundation",
+  "order": 6
+}

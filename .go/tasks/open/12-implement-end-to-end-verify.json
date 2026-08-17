@@ -40,6 +40,7 @@
   "depends_on": [
     "11-implement-bounded-apply"
   ],
-  "priority": 12,
-  "delivery": "product_implementation_backlog"
+  "priority": 20,
+  "delivery": "product_implementation_backlog",
+  "order": 20
 }

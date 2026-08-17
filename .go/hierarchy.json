@@ -51,6 +51,13 @@
       "title": "Service Adapters",
       "features": [
         {
+          "id": "shared-transport",
+          "title": "Shared read-only service transport",
+          "tasks": [
+            "transport-01-build-shared-readonly-transport"
+          ]
+        },
+        {
           "id": "arr-apis",
           "title": "Sonarr Radarr Prowlarr adapters",
           "tasks": [
@@ -65,6 +72,27 @@
           "tasks": [
             "06-implement-download-client-adapter",
             "07-implement-media-server-adapter"
+          ]
+        }
+      ],
+      "tasks": []
+    },
+    {
+      "id": "lab-runtime",
+      "title": "Local Docker Lab",
+      "features": [
+        {
+          "id": "local-docker-lab",
+          "title": "Disposable isolated service lab",
+          "tasks": [
+            "lab-00-register-lab-workstream",
+            "lab-01-define-local-stack-contract",
+            "lab-02-build-compose-foundation",
+            "lab-03-add-deterministic-dependency-doubles",
+            "lab-04-bootstrap-services",
+            "lab-05-implement-scenario-controller",
+            "lab-06-prove-readonly-stack",
+            "lab-07-prove-plan-apply-verify"
           ]
         }
       ],

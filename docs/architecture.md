@@ -39,9 +39,9 @@ doctor → plan → apply → verify
 
 Every command will support structured output. Read-only discovery remains separate from mutation.
 
-### Service adapters
+### Shared transport and service adapters
 
-Each adapter owns API-version discovery, capability reporting, authentication, request/response normalization, retries, redaction, and test fixtures. The core does not depend directly on service-specific response shapes.
+The shared read-only transport owns endpoint and credential resolution, URL/TLS policy, timeouts, bounded retries, HTTP-method policy, typed transport failures, and redaction. Each adapter owns service-specific API-version discovery, capability reporting, any explicitly classified authentication handshake, request/response normalization, and fixtures. The core does not depend directly on service-specific response shapes, and adapters do not implement private HTTP stacks.
 
 ### External runtime state
 

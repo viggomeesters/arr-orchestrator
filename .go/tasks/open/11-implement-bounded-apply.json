@@ -41,6 +41,7 @@
   "depends_on": [
     "10-implement-plan-engine"
   ],
-  "priority": 11,
-  "delivery": "product_implementation_backlog"
+  "priority": 19,
+  "delivery": "product_implementation_backlog",
+  "order": 19
 }

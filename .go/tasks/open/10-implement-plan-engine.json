@@ -39,8 +39,9 @@
   "review_history": [],
   "evidence": [],
   "depends_on": [
-    "09-implement-doctor-rules"
+    "lab-06-prove-readonly-stack"
   ],
-  "priority": 10,
-  "delivery": "product_implementation_backlog"
+  "priority": 18,
+  "delivery": "product_implementation_backlog",
+  "order": 18
 }

@@ -17,16 +17,20 @@
     "modify": [
       "src/arr_orchestrator/inventory/**",
       "tests/inventory/**",
-      "docs/inventory.md"
+      "docs/inventory.md",
+      "tests/integration/test_lab_inventory.py"
     ]
   },
   "acceptance": [
     "Inventory preserves service-level evidence and uncertainty.",
     "Partial service availability does not become an all-green stack claim.",
-    "Serialized inventory contains no credentials or raw private responses."
+    "Serialized inventory contains no credentials or raw private responses.",
+    "All five adapters contribute to one normalized inventory in the real local lab.",
+    "The healthy baseline and partial availability are proven through focused real-lab smoke tests."
   ],
   "verification": [
     "python3 -m unittest discover -s tests/inventory -p \"test_*.py\"",
+    "python3 scripts/lab.py test inventory",
     "bash scripts/check.sh"
   ],
   "claim": {
@@ -40,8 +44,11 @@
   "depends_on": [
     "03-implement-sonarr-readonly-adapter",
     "04-implement-radarr-readonly-adapter",
-    "05-implement-prowlarr-readonly-adapter"
+    "05-implement-prowlarr-readonly-adapter",
+    "06-implement-download-client-adapter",
+    "07-implement-media-server-adapter"
   ],
-  "priority": 8,
-  "delivery": "product_implementation_backlog"
+  "priority": 15,
+  "delivery": "product_implementation_backlog",
+  "order": 15
 }

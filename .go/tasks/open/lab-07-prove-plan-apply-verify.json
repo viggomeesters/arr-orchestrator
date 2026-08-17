@@ -1,0 +1,58 @@
+{
+  "schema": "go-workflow.repo-local.task.v1",
+  "kind": "task",
+  "execution_mode": "agent",
+  "shareable_delivery": "none",
+  "id": "lab-07-prove-plan-apply-verify",
+  "project": "arr-orchestrator",
+  "status": "open",
+  "summary": "Prove bounded repair lifecycle in the lab",
+  "description": "Exercise the real doctor, deterministic plan, approval, bounded apply, API readback, verify, stale-plan rejection, and destructive denial chain only inside the disposable lab.",
+  "scope": {
+    "read": [
+      "docs/local-lab.md",
+      "src/arr_orchestrator/**",
+      "lab/**",
+      "schemas/contracts/v1/**",
+      "AGENTS.md",
+      ".go/project.json",
+      ".go/vision.json",
+      ".go/architecture-principles.json",
+      "docs/architecture.md",
+      "docs/security-model.md",
+      ".go/tasks/done/12-implement-end-to-end-verify.json"
+    ],
+    "modify": [
+      "tests/e2e/test_lab_repair_lifecycle.py",
+      "tests/e2e/test_lab_stale_plan.py",
+      "tests/e2e/test_lab_destructive_denial.py",
+      "docs/lab-mutation-proof.md"
+    ]
+  },
+  "acceptance": [
+    "A wrong qBittorrent category is diagnosed and produces an exact hashed plan.",
+    "Explicit approval permits only the bounded non-destructive repair through official APIs.",
+    "Fresh API readback and verify prove the requested outcome.",
+    "State changed after planning causes stale-plan rejection.",
+    "A destructive or unauthorized request fails closed without mutation.",
+    "The lab returns to the canonical healthy state and committed proof remains redacted."
+  ],
+  "verification": [
+    "python3 scripts/lab.py test e2e",
+    "bash scripts/check.sh"
+  ],
+  "claim": {
+    "agent": null,
+    "claimed_at": null
+  },
+  "work_status": "pending",
+  "review_status": "none",
+  "review_history": [],
+  "evidence": [],
+  "depends_on": [
+    "12-implement-end-to-end-verify"
+  ],
+  "priority": 21,
+  "delivery": "lab_promotion_gate",
+  "order": 21
+}

@@ -1,0 +1,62 @@
+{
+  "schema": "go-workflow.repo-local.task.v1",
+  "kind": "task",
+  "execution_mode": "agent",
+  "shareable_delivery": "none",
+  "id": "lab-05-implement-scenario-controller",
+  "project": "arr-orchestrator",
+  "status": "open",
+  "summary": "Implement deterministic lab scenarios",
+  "description": "Provide an allowlisted controller that switches the disposable stack between the canonical healthy baseline and named broken states using one declared authority per scenario.",
+  "scope": {
+    "read": [
+      "docs/local-lab.md",
+      "lab/compose.yaml",
+      "lab/controller/bootstrap.py",
+      "lab/readiness.json",
+      "lab/security-matrix.json",
+      "scripts/lab.py",
+      "AGENTS.md",
+      ".go/project.json",
+      ".go/vision.json",
+      ".go/architecture-principles.json",
+      "docs/architecture.md",
+      "docs/security-model.md",
+      ".go/tasks/done/lab-04-bootstrap-services.json"
+    ],
+    "modify": [
+      "lab/controller/scenarios.py",
+      "lab/scenarios/**",
+      "tests/lab/test_scenarios.py",
+      "tests/fixtures/lab/scenarios/**",
+      "scripts/lab.py"
+    ]
+  },
+  "acceptance": [
+    "Required scenarios cover category, root-folder, application-sync, path mapping, cross-device hardlink, unreachable service, unsupported version, stale plan, and destructive denial.",
+    "Every scenario declares exactly one driver: controller-api, host-compose, or runner-config.",
+    "Applying the same scenario twice is idempotent and healthy restores the verified baseline.",
+    "Host-compose operations verify the exact Compose project and lab labels before bounded lifecycle or topology changes.",
+    "Neither controller nor runner receives Docker-socket access and no scenario changes files outside the marked lab root.",
+    "Topology scenarios use committed, rendered Compose override files under lab/scenarios rather than dynamically generated or inline YAML."
+  ],
+  "verification": [
+    "python3 -m unittest tests.lab.test_scenarios",
+    "python3 scripts/lab.py test scenarios",
+    "bash scripts/check.sh"
+  ],
+  "claim": {
+    "agent": null,
+    "claimed_at": null
+  },
+  "work_status": "pending",
+  "review_status": "none",
+  "review_history": [],
+  "evidence": [],
+  "depends_on": [
+    "lab-04-bootstrap-services"
+  ],
+  "priority": 8,
+  "delivery": "lab_foundation",
+  "order": 8
+}

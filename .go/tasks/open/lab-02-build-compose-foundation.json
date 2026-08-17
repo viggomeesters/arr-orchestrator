@@ -1,0 +1,65 @@
+{
+  "schema": "go-workflow.repo-local.task.v1",
+  "kind": "task",
+  "execution_mode": "agent",
+  "shareable_delivery": "none",
+  "id": "lab-02-build-compose-foundation",
+  "project": "arr-orchestrator",
+  "status": "open",
+  "summary": "Build the isolated Compose lab foundation",
+  "description": "Build the pinned Compose topology, controller/runner image, image lock, readiness matrix, security matrix, host wrapper, and network-isolation contract without starting unseeded real services.",
+  "scope": {
+    "read": [
+      "docs/local-lab.md",
+      "docs/security-model.md",
+      "schemas/lab-*.schema.json",
+      "pyproject.toml",
+      "src/**",
+      "scripts/**",
+      "AGENTS.md",
+      ".go/project.json",
+      ".go/vision.json",
+      ".go/architecture-principles.json",
+      "docs/architecture.md",
+      ".go/tasks/done/lab-01-define-local-stack-contract.json"
+    ],
+    "modify": [
+      ".dockerignore",
+      "lab/compose.yaml",
+      "lab/Dockerfile.controller",
+      "lab/images.lock.json",
+      "lab/readiness.json",
+      "lab/security-matrix.json",
+      "scripts/lab.py",
+      "tests/lab/test_compose_contract.py"
+    ]
+  },
+  "acceptance": [
+    "Rendered MVP Compose publishes zero host ports and attaches every application service only to an internal bridge with isolated gateway mode.",
+    "Every image reference and Dockerfile base is platform-specific and pinned by immutable digest with provenance metadata.",
+    "No service is privileged or mounts the Docker socket; controller and runner are non-root, capability-free, no-new-privileges, and read-only-root with explicit writable mounts only.",
+    "Build contexts exclude Git, workflow state, plans, credentials, runtime state, evidence, caches, media, and downloads.",
+    "Only the controller isolation probe starts; real Sonarr, Radarr, Prowlarr, qBittorrent, and Jellyfin processes remain stopped until lab-04.",
+    "Negative probes prove no host/API exposure, LAN/internet reachability, or Docker authority."
+  ],
+  "verification": [
+    "docker compose -f lab/compose.yaml config --quiet",
+    "python3 -m unittest tests.lab.test_compose_contract",
+    "python3 scripts/lab.py test isolation",
+    "bash scripts/check.sh"
+  ],
+  "claim": {
+    "agent": null,
+    "claimed_at": null
+  },
+  "work_status": "pending",
+  "review_status": "none",
+  "review_history": [],
+  "evidence": [],
+  "depends_on": [
+    "lab-01-define-local-stack-contract"
+  ],
+  "priority": 5,
+  "delivery": "lab_foundation",
+  "order": 5
+}

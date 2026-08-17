@@ -18,16 +18,21 @@
       "src/arr_orchestrator/adapters/radarr.py",
       "tests/adapters/test_radarr.py",
       "tests/fixtures/radarr/**",
-      "docs/adapters/radarr.md"
+      "docs/adapters/radarr.md",
+      "tests/integration/test_radarr_lab.py"
     ]
   },
   "acceptance": [
     "Unsupported API versions fail with a typed blocker.",
     "Secrets and request headers are redacted from all output.",
-    "Synthetic fixtures prove normalized capability and configuration output."
+    "Synthetic fixtures prove normalized capability and configuration output.",
+    "The adapter reuses transport-01 for endpoint policy, credentials, retries, typed failures, and redaction rather than implementing a private HTTP stack.",
+    "Fast synthetic fixture tests and a focused real-container radarr lane both pass.",
+    "Read-only operation performs no domain mutation; any required authentication session is explicitly classified and side-effect-free."
   ],
   "verification": [
     "python3 -m unittest tests.adapters.test_radarr",
+    "python3 scripts/lab.py test adapter radarr",
     "bash scripts/check.sh"
   ],
   "claim": {
@@ -39,8 +44,9 @@
   "review_history": [],
   "evidence": [],
   "depends_on": [
-    "02-build-arrctl-skeleton"
+    "transport-01-build-shared-readonly-transport"
   ],
-  "priority": 4,
-  "delivery": "product_implementation_backlog"
+  "priority": 11,
+  "delivery": "product_implementation_backlog",
+  "order": 11
 }

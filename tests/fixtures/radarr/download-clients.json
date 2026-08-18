@@ -1,0 +1,17 @@
+[
+  {
+    "id": 2,
+    "name": "Synthetic qBittorrent",
+    "implementation": "QBittorrent",
+    "implementationName": "qBittorrent",
+    "protocol": "torrent",
+    "enable": true,
+    "priority": 1,
+    "removeCompletedDownloads": true,
+    "removeFailedDownloads": false,
+    "fields": [
+      {"name": "host", "value": "qbittorrent"},
+      {"name": "secretSetting", "value": "private-radarr-setting-canary"}
+    ]
+  }
+]

@@ -1,0 +1,10 @@
+{
+  "page": 2,
+  "pageSize": 100,
+  "sortKey": "timeleft",
+  "sortDirection": "ascending",
+  "totalRecords": 3,
+  "records": [
+    {"id": 12, "status": "completed", "title": "Synthetic Movie Three", "outputPath": "/private/path"}
+  ]
+}

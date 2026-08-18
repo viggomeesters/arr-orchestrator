@@ -1,0 +1,9 @@
+{
+  "appName": "Radarr",
+  "version": "6.3.0.10514",
+  "branch": "master",
+  "runtimeVersion": "8.0.20",
+  "osName": "debian",
+  "startupPath": "/app/radarr/bin",
+  "urlBase": ""
+}

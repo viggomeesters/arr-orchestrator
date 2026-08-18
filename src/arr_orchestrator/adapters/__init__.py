@@ -1,3 +1,14 @@
+from .radarr import (
+    RadarrAdapter,
+    RadarrAdapterFailure,
+    RadarrCapabilities,
+    RadarrDownloadClient,
+    RadarrQualityProfile,
+    RadarrQueueSummary,
+    RadarrRootFolder,
+    RadarrSnapshot,
+    RadarrSystemStatus,
+)
 from .sonarr import (
     SonarrAdapter,
     SonarrAdapterFailure,
@@ -11,6 +22,15 @@ from .sonarr import (
 )
 
 __all__ = [
+    "RadarrAdapter",
+    "RadarrAdapterFailure",
+    "RadarrCapabilities",
+    "RadarrDownloadClient",
+    "RadarrQualityProfile",
+    "RadarrQueueSummary",
+    "RadarrRootFolder",
+    "RadarrSnapshot",
+    "RadarrSystemStatus",
     "SonarrAdapter",
     "SonarrAdapterFailure",
     "SonarrCapabilities",

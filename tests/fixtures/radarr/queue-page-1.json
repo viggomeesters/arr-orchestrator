@@ -1,0 +1,11 @@
+{
+  "page": 1,
+  "pageSize": 100,
+  "sortKey": "timeleft",
+  "sortDirection": "ascending",
+  "totalRecords": 3,
+  "records": [
+    {"id": 10, "status": "downloading", "title": "Synthetic Movie One", "downloadId": "private-download-id"},
+    {"id": 11, "status": "warning", "title": "Synthetic Movie Two", "movieId": 42}
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "schema": "go-workflow.repo-local.task.v1",
+  "kind": "task",
+  "execution_mode": "agent",
+  "shareable_delivery": "none",
+  "id": "16-implement-host-preflight",
+  "project": "arr-orchestrator",
+  "status": "open",
+  "summary": "Implement read-only host deployment preflight",
+  "description": "Inspect an explicitly authorized target host before planning installation, without installing packages or changing host state.",
+  "scope": {
+    "read": [
+      "schemas/deployment/**",
+      "docs/deployment-contract.md",
+      "src/arr_orchestrator/transport.py",
+      "lab/security-matrix.json"
+    ],
+    "modify": [
+      "src/arr_orchestrator/deployment/preflight.py",
+      "src/arr_orchestrator/deployment/models.py",
+      "tests/deployment/test_preflight.py",
+      "tests/integration/test_host_preflight_lab.py",
+      "docs/host-preflight.md"
+    ]
+  },
+  "acceptance": [
+    "Preflight reports OS, architecture, Docker/Compose availability, filesystem identity, free space, UID/GID, required path ownership, port conflicts, and hardlink feasibility as typed redacted evidence.",
+    "Preflight is strictly read-only and uses controlled SSH authority without ambient credentials, agent forwarding, or shell interpolation of untrusted values.",
+    "Missing sudo/Docker authority, unsupported platform, ambiguous mounts, insufficient capacity, and unreachable host produce explicit blockers rather than guessed plans.",
+    "A disposable remote-host fixture proves healthy and blocked preflight paths without exposing private host identifiers."
+  ],
+  "verification": [
+    "python3 -m unittest tests.deployment.test_preflight tests.integration.test_host_preflight_lab",
+    "bash scripts/check.sh"
+  ],
+  "claim": {
+    "agent": null,
+    "claimed_at": null
+  },
+  "work_status": "pending",
+  "review_status": "none",
+  "review_history": [],
+  "evidence": [],
+  "depends_on": [
+    "15-define-real-host-deployment-contract"
+  ],
+  "priority": 25,
+  "delivery": "product_implementation_backlog",
+  "order": 25
+}

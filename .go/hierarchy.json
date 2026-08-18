@@ -97,6 +97,20 @@
         }
       ],
       "tasks": []
+    },
+    {
+      "id": "real-host-deployment",
+      "title": "Real Host Deployment",
+      "description": "Safely preflight, render, bootstrap, start, verify, and operate a private arr stack on an explicitly authorized remote host after the synthetic control plane is proven.",
+      "features": [],
+      "tasks": [
+        "15-define-real-host-deployment-contract",
+        "16-implement-host-preflight",
+        "17-render-private-stack-deployment",
+        "18-implement-guarded-host-bootstrap",
+        "19-prove-real-host-promotion",
+        "20-implement-deployment-command-contract"
+      ]
     }
   ]
 }

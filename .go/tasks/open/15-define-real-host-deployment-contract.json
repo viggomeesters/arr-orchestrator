@@ -1,0 +1,51 @@
+{
+  "schema": "go-workflow.repo-local.task.v1",
+  "kind": "task",
+  "execution_mode": "agent",
+  "shareable_delivery": "none",
+  "id": "15-define-real-host-deployment-contract",
+  "project": "arr-orchestrator",
+  "status": "open",
+  "summary": "Define the real-host deployment contract",
+  "description": "Define the desired-state, authority, secret-reference, storage, network, lifecycle, backup, and rollback contract for provisioning a private arr stack without committing deployment state.",
+  "scope": {
+    "read": [
+      "docs/architecture.md",
+      "docs/security-model.md",
+      "docs/implementation-plan.md",
+      "schemas/contracts/v1/**",
+      "lab/compose.yaml",
+      "lab/images.lock.json"
+    ],
+    "modify": [
+      "schemas/deployment/**",
+      "examples/deployment/**",
+      "tests/contracts/test_deployment_contract.py",
+      "docs/deployment-contract.md"
+    ]
+  },
+  "acceptance": [
+    "Desired state explicitly models target platform, services, immutable image references, UID/GID, config/download/media paths, network exposure, restart policy, backup policy, and secret references without credential values.",
+    "SSH, sudo, Docker, filesystem, and service-API authority are distinct and fail closed when not explicitly granted.",
+    "Unsafe path overlap, ambiguous filesystem identity, unpinned images, plaintext secrets, Docker-socket injection, and unsupported exposure modes are rejected.",
+    "Synthetic public-safe examples validate without real hostnames, addresses, paths, or household configuration."
+  ],
+  "verification": [
+    "python3 -m unittest tests.contracts.test_deployment_contract",
+    "bash scripts/check.sh"
+  ],
+  "claim": {
+    "agent": null,
+    "claimed_at": null
+  },
+  "work_status": "pending",
+  "review_status": "none",
+  "review_history": [],
+  "evidence": [],
+  "depends_on": [
+    "14-prove-synthetic-stack-e2e"
+  ],
+  "priority": 24,
+  "delivery": "product_implementation_backlog",
+  "order": 24
+}

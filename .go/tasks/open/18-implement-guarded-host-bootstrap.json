@@ -1,0 +1,52 @@
+{
+  "schema": "go-workflow.repo-local.task.v1",
+  "kind": "task",
+  "execution_mode": "agent",
+  "shareable_delivery": "none",
+  "id": "18-implement-guarded-host-bootstrap",
+  "project": "arr-orchestrator",
+  "status": "open",
+  "summary": "Implement guarded host bootstrap and lifecycle",
+  "description": "Apply an approved deployment bundle to an authorized host: provision prerequisites and directories, pull images, place protected runtime files, start services, and manage restart lifecycle with rollback.",
+  "scope": {
+    "read": [
+      "src/arr_orchestrator/planning/**",
+      "src/arr_orchestrator/apply/**",
+      "src/arr_orchestrator/verify/**",
+      "src/arr_orchestrator/deployment/**",
+      "docs/deployment-contract.md"
+    ],
+    "modify": [
+      "src/arr_orchestrator/deployment/bootstrap.py",
+      "src/arr_orchestrator/deployment/ssh.py",
+      "src/arr_orchestrator/deployment/rollback.py",
+      "tests/deployment/test_bootstrap.py",
+      "tests/integration/test_remote_bootstrap_lab.py",
+      "docs/host-bootstrap.md"
+    ]
+  },
+  "acceptance": [
+    "Bootstrap executes only an approved, current deployment plan against one exact host identity and rejects stale preflight, changed bundles, host mismatch, or missing authority.",
+    "Package installation, directory creation, image pull, protected file placement, Compose startup, and restart enablement are allowlisted, bounded, attributed, and independently read back.",
+    "Existing configuration is backed up before replacement; partial failure stops safely and exposes an exact rollback or recovery state without broad cleanup.",
+    "No credential, private host identifier, Compose environment value, or remote command output enters public evidence or exception chains."
+  ],
+  "verification": [
+    "python3 -m unittest tests.deployment.test_bootstrap tests.integration.test_remote_bootstrap_lab",
+    "bash scripts/check.sh"
+  ],
+  "claim": {
+    "agent": null,
+    "claimed_at": null
+  },
+  "work_status": "pending",
+  "review_status": "none",
+  "review_history": [],
+  "evidence": [],
+  "depends_on": [
+    "17-render-private-stack-deployment"
+  ],
+  "priority": 27,
+  "delivery": "product_implementation_backlog",
+  "order": 27
+}

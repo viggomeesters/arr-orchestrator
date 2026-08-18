@@ -1,0 +1,52 @@
+{
+  "schema": "go-workflow.repo-local.task.v1",
+  "kind": "task",
+  "execution_mode": "agent",
+  "shareable_delivery": "none",
+  "id": "17-render-private-stack-deployment",
+  "project": "arr-orchestrator",
+  "status": "open",
+  "summary": "Render a deterministic private stack deployment",
+  "description": "Render a machine-specific Compose/config/secret-reference bundle outside Git from validated desired state and preflight evidence.",
+  "scope": {
+    "read": [
+      "schemas/deployment/**",
+      "docs/deployment-contract.md",
+      "lab/compose.yaml",
+      "lab/images.lock.json",
+      "src/arr_orchestrator/deployment/models.py"
+    ],
+    "modify": [
+      "src/arr_orchestrator/deployment/render.py",
+      "src/arr_orchestrator/deployment/templates/**",
+      "tests/deployment/test_render.py",
+      "tests/fixtures/deployment/**",
+      "docs/deployment-rendering.md"
+    ]
+  },
+  "acceptance": [
+    "Equivalent desired state and preflight inputs produce a byte-stable deployment identity and deterministic private bundle under the configured XDG runtime root.",
+    "Rendered Compose uses immutable images, health checks, bounded resources, explicit networks, least privilege, no Docker socket, and validated storage mappings.",
+    "Credential values never enter plans, logs, Git fixtures, command arguments, or rendered public evidence; only protected runtime files and secret references are used.",
+    "Rendering refuses stale preflight evidence, unsafe path changes, unsupported exposure, and missing backup or rollback prerequisites."
+  ],
+  "verification": [
+    "python3 -m unittest tests.deployment.test_render",
+    "python3 scripts/check_public_safety.py",
+    "bash scripts/check.sh"
+  ],
+  "claim": {
+    "agent": null,
+    "claimed_at": null
+  },
+  "work_status": "pending",
+  "review_status": "none",
+  "review_history": [],
+  "evidence": [],
+  "depends_on": [
+    "16-implement-host-preflight"
+  ],
+  "priority": 26,
+  "delivery": "product_implementation_backlog",
+  "order": 26
+}

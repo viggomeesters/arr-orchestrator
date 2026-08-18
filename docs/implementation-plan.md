@@ -58,6 +58,19 @@ broken scenario
 → healthy inventory
 ```
 
+## Phase 6 — Real-host deployment
+
+The synthetic control plane must pass task 14 before real-host provisioning becomes eligible. This phase turns a validated desired state into a private, reproducible deployment without copying household configuration into Git.
+
+24. **`15-define-real-host-deployment-contract`** — define target-host identity, authority, pinned images, storage, networking, secrets, backup, lifecycle, and rollback contracts.
+25. **`16-implement-host-preflight`** — inspect an explicitly authorized host read-only for platform support, Docker/Compose, capacity, filesystem identity, ownership, port conflicts, and hardlink feasibility.
+26. **`17-render-private-stack-deployment`** — render a byte-stable private Compose/config/secret-reference bundle under the external XDG runtime root.
+27. **`18-implement-guarded-host-bootstrap`** — apply one approved current plan to one exact host: provision prerequisites and directories, pull pinned images, install protected runtime files, start services, enable restart lifecycle, and retain bounded rollback.
+28. **`19-prove-real-host-promotion`** — prove fresh-host install, service wiring, reboot recovery, stale-plan denial, rollback, and exact marked cleanup on a disposable remote host.
+29. **`20-implement-deployment-command-contract`** — expose preflight → plan → approval → bootstrap → verify through the Hermes/Telegram operation contract.
+
+The first household deployment is a runtime operation after this phase, not a committed fixture or test. It starts with read-only host identity and preflight, requires approval of the exact deployment plan, and ends only after independent service/API readback and health verification.
+
 ## Dependency policy
 
 - Lab and shared transport precede every service adapter.
@@ -66,8 +79,11 @@ broken scenario
 - Plan identity and policy precede apply; fresh readback verification follows every mutation.
 - `lab-07` must pass before the Hermes command contract becomes eligible.
 - Task 14 is the final synthetic release gate, not a substitute for adapter, inventory, doctor, or mutation tests.
+- Task 14 gates the complete real-host deployment epic; no host provisioning task may bypass the synthetic release proof.
+- Real-host deployment separates read-only preflight, deterministic rendering, remote bootstrap, promotion proof, and operator command routing so each authority boundary is independently reviewable.
+- Household installation state, credentials, host identities, rendered bundles, backups, logs, and remote command output remain outside Git.
 - No task may use private deployment data, manipulate application databases directly, expose application ports, or weaken approval and stale-plan protections because the target is disposable.
-- The real deployment remains out of scope until the corresponding lab chain is green. Its first promotion step is explicit read-only access.
+- A real household deployment remains out of scope until task 20 is green. Its first runtime step is explicit read-only host identity and preflight.
 - A human dashboard remains outside this plan.
 
 Use `./go next .` as the canonical task selector; this document explains the sequence but does not override repository-local task state.

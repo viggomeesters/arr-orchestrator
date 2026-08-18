@@ -1,0 +1,51 @@
+{
+  "schema": "go-workflow.repo-local.task.v1",
+  "kind": "task",
+  "execution_mode": "agent",
+  "shareable_delivery": "none",
+  "id": "20-implement-deployment-command-contract",
+  "project": "arr-orchestrator",
+  "status": "open",
+  "summary": "Expose guarded stack deployment through Hermes",
+  "description": "Extend the Hermes command contract so one operator instruction can request preflight, plan, approval, bootstrap, startup, and verification without leaking deployment internals.",
+  "scope": {
+    "read": [
+      "docs/hermes-integration.md",
+      "schemas/hermes-operation.schema.json",
+      "src/arr_orchestrator/deployment/**",
+      "docs/real-host-promotion-proof.md"
+    ],
+    "modify": [
+      "src/arr_orchestrator/cli.py",
+      "src/arr_orchestrator/deployment/commands.py",
+      "docs/hermes-deployment.md",
+      "schemas/hermes-deployment-operation.schema.json",
+      "tests/test_cli.py",
+      "tests/integration/test_hermes_deployment_contract.py"
+    ]
+  },
+  "acceptance": [
+    "Natural-language install/start intents map to deterministic preflight, plan, approval, apply, and verify operations with explicit target-host and authority boundaries.",
+    "The command pauses only for real missing choices, credentials, destructive authority, or approval of the exact deployment plan; ordinary discovery and verification continue autonomously.",
+    "Progress and final Telegram output remain concise, redacted, evidence-backed, and distinguish installed, started, healthy, blocked, rolled back, and unverified states.",
+    "A synthetic command proof reaches a healthy stack and proves stale-plan, unauthorized-host, and destructive-action denial."
+  ],
+  "verification": [
+    "python3 -m unittest tests.integration.test_hermes_deployment_contract",
+    "bash scripts/check.sh"
+  ],
+  "claim": {
+    "agent": null,
+    "claimed_at": null
+  },
+  "work_status": "pending",
+  "review_status": "none",
+  "review_history": [],
+  "evidence": [],
+  "depends_on": [
+    "19-prove-real-host-promotion"
+  ],
+  "priority": 29,
+  "delivery": "product_implementation_backlog",
+  "order": 29
+}

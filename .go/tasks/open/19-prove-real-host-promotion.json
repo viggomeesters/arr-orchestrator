@@ -1,0 +1,50 @@
+{
+  "schema": "go-workflow.repo-local.task.v1",
+  "kind": "task",
+  "execution_mode": "agent",
+  "shareable_delivery": "none",
+  "id": "19-prove-real-host-promotion",
+  "project": "arr-orchestrator",
+  "status": "open",
+  "summary": "Prove fresh-host deployment and promotion",
+  "description": "Prove the complete installation lifecycle on a disposable remote host before any household deployment is eligible.",
+  "scope": {
+    "read": [
+      "src/arr_orchestrator/deployment/**",
+      "src/arr_orchestrator/inventory/**",
+      "src/arr_orchestrator/doctor/**",
+      "src/arr_orchestrator/verify/**",
+      "docs/host-bootstrap.md"
+    ],
+    "modify": [
+      "tests/e2e/test_remote_host_deployment.py",
+      "tests/e2e/test_remote_host_recovery.py",
+      "tests/fixtures/deployment-promotion/**",
+      "docs/real-host-promotion-proof.md"
+    ]
+  },
+  "acceptance": [
+    "A clean disposable host is preflighted, planned, explicitly approved, bootstrapped, started, inventoried, diagnosed, and verified through supported service APIs.",
+    "The proof confirms pinned images, protected credentials, correct ownership and mounts, actual hardlink feasibility, healthy service wiring, restart policy, and recovery after a controlled reboot.",
+    "Stale plan, wrong host identity, unavailable backup, unauthorized sudo, failed readiness, and destructive cleanup requests fail closed without partial green claims.",
+    "Rollback and teardown remove only exact marked resources and leave zero matching containers, networks, volumes, runtime directories, or remote deployment residue."
+  ],
+  "verification": [
+    "python3 -m unittest tests.e2e.test_remote_host_deployment tests.e2e.test_remote_host_recovery",
+    "bash scripts/check.sh"
+  ],
+  "claim": {
+    "agent": null,
+    "claimed_at": null
+  },
+  "work_status": "pending",
+  "review_status": "none",
+  "review_history": [],
+  "evidence": [],
+  "depends_on": [
+    "18-implement-guarded-host-bootstrap"
+  ],
+  "priority": 28,
+  "delivery": "real_host_promotion_gate",
+  "order": 28
+}

@@ -658,6 +658,119 @@ print(json.dumps({
     return emit(result)
 
 
+def test_transport() -> int:
+    lab_id, project, root = create_runtime()
+    env = lab_env(lab_id, project, root)
+    completed = False
+    result: dict[str, object]
+    try:
+        canary_value = secrets.token_urlsafe(32)
+        credential_name = "fault-api-token"
+        secret_path = write_secret(root, credential_name, value=canary_value)
+        run(
+            compose_command(
+                "--profile", "doubles", "up", "-d", "--build", "--wait", "fault-api"
+            ),
+            env=env,
+        )
+        service_rows = run(
+            [
+                "docker", "ps", "--filter", f"label=com.docker.compose.project={project}",
+                "--format", "{{.Label \"com.docker.compose.service\"}}={{.ID}}",
+            ]
+        ).stdout.splitlines()
+        services = dict(row.split("=", 1) for row in service_rows if "=" in row)
+        if set(services) != {"fault-api"}:
+            raise LabError("transport probe started an unexpected service set")
+        verify_double_container(project, services["fault-api"], "fault-api-token")
+        probe = r'''
+import json, urllib.request
+from pathlib import Path
+from arr_orchestrator.config import ServiceEndpoint
+from arr_orchestrator.credentials import FileCredentialResolver
+from arr_orchestrator.transport import ReadOnlyHttpTransport, TransportFailure, TransportPolicy
+
+resolver = FileCredentialResolver(Path('/run/secrets'), expected_uid=65532)
+credential = resolver.resolve('file:fault-api-token').reveal()
+endpoint = ServiceEndpoint('fault-api', 'http://fault-api:8080', 'file:fault-api-token')
+
+def set_scenario(name):
+    body = json.dumps({'scenario': name}, separators=(',', ':')).encode()
+    request = urllib.request.Request(
+        'http://fault-api:8080/scenario', data=body,
+        headers={'Authorization': f'Bearer {credential}', 'Content-Type': 'application/json'}, method='PUT'
+    )
+    with urllib.request.urlopen(request, timeout=1) as response:
+        if response.status != 200:
+            raise SystemExit('scenario control failed')
+
+results = {}
+for name in ('healthy', 'unavailable', 'malformed-json', 'timeout', 'unsupported-version', 'stale-readback'):
+    set_scenario(name)
+    policy = TransportPolicy(deadline_seconds=0.2 if name == 'timeout' else 1, max_attempts=1)
+    client = ReadOnlyHttpTransport(endpoint, resolver, policy=policy)
+    try:
+        results[name] = {'status': 'ok', 'data': client.get_json('/api/v1/probe')}
+    except TransportFailure as error:
+        results[name] = {'status': 'error', 'code': error.code, 'retryable': error.retryable}
+set_scenario('healthy')
+print(json.dumps({'schema': 'arr-orchestrator.lab-transport-probe.v1', 'results': results}, sort_keys=True))
+'''
+        controller = run(
+            compose_command(
+                "--profile", "isolation", "run", "--rm", "--build", "--no-deps",
+                "--volume", f"{secret_path}:/run/secrets/{credential_name}:ro",
+                "--entrypoint", "python3", "lab-controller", "-c", probe,
+            ),
+            env=env,
+            check=False,
+        )
+        if controller.returncode != 0:
+            raise LabError("transport controller probe failed")
+        payload = last_json_object(controller.stdout)
+        expected_errors = {
+            "unavailable": "SERVICE_UNREACHABLE",
+            "malformed-json": "JSON_INVALID",
+            "timeout": "DEADLINE_EXCEEDED",
+        }
+        outcomes = payload.get("results", {})
+        for scenario, code in expected_errors.items():
+            if outcomes.get(scenario, {}).get("code") != code:
+                raise LabError(f"transport fault classification mismatch: {scenario}")
+        if outcomes.get("healthy", {}).get("data", {}).get("status") != "ok":
+            raise LabError("transport healthy read failed")
+        if outcomes.get("unsupported-version", {}).get("data", {}).get("api_version") != "999":
+            raise LabError("transport did not preserve service-specific version data")
+        if outcomes.get("stale-readback", {}).get("data", {}).get("status") != "stale":
+            raise LabError("transport did not preserve service-specific stale data")
+        if canary_value in controller.stdout or canary_value in controller.stderr:
+            raise LabError("transport probe output exposed its credential")
+        result = {
+            "schema": "arr-orchestrator.lab-transport-run.v1",
+            "lab_id": lab_id,
+            "ok": True,
+            "read_only_requests": 6,
+            "typed_faults": expected_errors,
+            "service_specific_payloads": ["stale-readback", "unsupported-version"],
+            "published_ports": 0,
+        }
+        completed = True
+    finally:
+        down = run(compose_down_command("doubles", "isolation"), env=env, check=False)
+        remaining_containers = run(
+            ["docker", "ps", "-aq", "--filter", f"label=com.docker.compose.project={project}"]
+        ).stdout.split()
+        remaining_networks = run(
+            ["docker", "network", "ls", "-q", "--filter", f"label=com.docker.compose.project={project}"]
+        ).stdout.split()
+        remaining_images = remaining_project_images(project)
+        if down.returncode != 0 or remaining_containers or remaining_networks or remaining_images:
+            finalize_runtime(root, lab_id, project, success=False)
+            raise LabError("bounded transport cleanup did not converge")
+        finalize_runtime(root, lab_id, project, success=completed)
+    return emit(result)
+
+
 def write_private_text(path: Path, content: str, uid: int, gid: int) -> None:
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(path.parent, 0o700)
@@ -1395,7 +1508,9 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("render")
     test_parser = subparsers.add_parser("test")
-    test_parser.add_argument("suite", choices=("isolation", "doubles", "bootstrap", "scenarios"))
+    test_parser.add_argument(
+        "suite", choices=("isolation", "doubles", "bootstrap", "scenarios", "transport")
+    )
     subparsers.add_parser("container-health-server")
     subparsers.add_parser("container-idle")
     return parser
@@ -1413,6 +1528,8 @@ def main(argv: list[str] | None = None) -> int:
                 return test_bootstrap()
             if args.suite == "scenarios":
                 return test_scenarios()
+            if args.suite == "transport":
+                return test_transport()
             return test_isolation()
         if args.command == "container-health-server":
             return container_health_server()

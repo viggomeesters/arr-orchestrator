@@ -24,6 +24,8 @@ lab/*.local.json
 # Private deployment and runtime state
 .local/
 runtime/
+!schemas/runtime/
+!schemas/runtime/service-endpoints.schema.json
 state/
 inventory/
 plans/generated/

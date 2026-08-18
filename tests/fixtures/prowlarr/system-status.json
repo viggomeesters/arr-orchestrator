@@ -1,0 +1,9 @@
+{
+  "appName": "Prowlarr",
+  "version": "2.5.2.5491",
+  "branch": "develop",
+  "runtimeVersion": "8.0.20",
+  "osName": "debian",
+  "startupPath": "/app/prowlarr/bin",
+  "urlBase": ""
+}

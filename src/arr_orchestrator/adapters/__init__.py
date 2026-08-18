@@ -1,3 +1,12 @@
+from .prowlarr import (
+    ProwlarrAdapter,
+    ProwlarrAdapterFailure,
+    ProwlarrApplication,
+    ProwlarrCapabilities,
+    ProwlarrIndexerSummary,
+    ProwlarrSnapshot,
+    ProwlarrSystemStatus,
+)
 from .radarr import (
     RadarrAdapter,
     RadarrAdapterFailure,
@@ -22,6 +31,13 @@ from .sonarr import (
 )
 
 __all__ = [
+    "ProwlarrAdapter",
+    "ProwlarrAdapterFailure",
+    "ProwlarrApplication",
+    "ProwlarrCapabilities",
+    "ProwlarrIndexerSummary",
+    "ProwlarrSnapshot",
+    "ProwlarrSystemStatus",
     "RadarrAdapter",
     "RadarrAdapterFailure",
     "RadarrCapabilities",

@@ -1,0 +1,37 @@
+[
+  {
+    "id": 10,
+    "name": "Synthetic Public Indexer",
+    "implementation": "Cardigann",
+    "protocol": "torrent",
+    "privacy": "public",
+    "enable": true,
+    "priority": 25,
+    "appProfileId": 1,
+    "supportsRss": true,
+    "supportsSearch": true,
+    "supportsRedirect": false,
+    "redirect": false,
+    "indexerUrls": ["http://private-indexer.invalid"],
+    "fields": [
+      {"name": "apiKey", "value": "private-indexer-key-canary"},
+      {"name": "query", "value": "private-query-canary"}
+    ]
+  },
+  {
+    "id": 11,
+    "name": "Synthetic Usenet Indexer",
+    "implementation": "Newznab",
+    "protocol": "usenet",
+    "privacy": "private",
+    "enable": false,
+    "priority": 50,
+    "appProfileId": 2,
+    "supportsRss": true,
+    "supportsSearch": false,
+    "supportsRedirect": false,
+    "redirect": false,
+    "indexerUrls": ["http://another-private-indexer.invalid"],
+    "fields": []
+  }
+]

@@ -1,0 +1,97 @@
+{
+  "schema": "go-workflow.repo-local.task.v1",
+  "kind": "task",
+  "execution_mode": "agent",
+  "shareable_delivery": "none",
+  "id": "05-implement-prowlarr-readonly-adapter",
+  "project": "arr-orchestrator",
+  "status": "done",
+  "summary": "Implement the read-only Prowlarr adapter",
+  "description": "Add API version discovery and normalized read-only access to application sync state, indexer capabilities, and health using synthetic responses.",
+  "scope": {
+    "read": [
+      "schemas/**",
+      "src/**",
+      "docs/**"
+    ],
+    "modify": [
+      "src/arr_orchestrator/adapters/__init__.py",
+      "src/arr_orchestrator/adapters/prowlarr.py",
+      "scripts/lab.py",
+      "tests/adapters/test_prowlarr.py",
+      "tests/fixtures/prowlarr/**",
+      "docs/adapters/prowlarr.md",
+      "tests/integration/test_prowlarr_lab.py"
+    ]
+  },
+  "acceptance": [
+    "Application links and sync settings normalize into the core capability model.",
+    "Indexer data is summarized without persisting sensitive query or history data.",
+    "Synthetic fixtures prove success, unsupported version, and redaction behavior.",
+    "The adapter reuses transport-01 for endpoint policy, credentials, retries, typed failures, and redaction rather than implementing a private HTTP stack.",
+    "Fast synthetic fixture tests and a focused real-container prowlarr lane both pass.",
+    "Read-only operation performs no domain mutation; any required authentication session is explicitly classified and side-effect-free."
+  ],
+  "verification": [
+    "python3 -m unittest tests.adapters.test_prowlarr",
+    "python3 scripts/lab.py test adapter prowlarr",
+    "bash scripts/check.sh"
+  ],
+  "claim": {
+    "agent": "hermes",
+    "claimed_at": "2026-08-18T22:03:47+02:00"
+  },
+  "work_status": "completed",
+  "review_status": "review",
+  "review_history": [],
+  "evidence": [
+    {
+      "schema": "go-workflow.finish-evidence.v1",
+      "created_at": "2026-08-18T22:16:10+02:00",
+      "task_id": "05-implement-prowlarr-readonly-adapter",
+      "agent": "hermes",
+      "summary": "changed_files=docs/adapters/prowlarr.md,scripts/lab.py,src/arr_orchestrator/adapters/__init__.py,src/arr_orchestrator/adapters/prowlarr.py,tests/adapters/test_prowlarr.py,tests/fixtures/prowlarr/*,tests/integration/test_prowlarr_lab.py; verification=148_tests_passed,public_safety_186,scripts_check_passed,go_validate_passed,diff_check_passed,py_compile_passed; critic=verdict_A_hash_6bf2b3e265e7e58b45b8fc6add63ad9f662bf8270eddebbfcfe5a25aa051394d_12_paths_74_adversarial_probes; runtime=prowlarr_2.5.2.5491_api_v1_3_GET_0_ports_cleanup_0_0_0_0; billing_mode=local; owner=hermes",
+      "changed_files": [
+        "docs/adapters/prowlarr.md",
+        "scripts/lab.py",
+        "src/arr_orchestrator/adapters/__init__.py",
+        "src/arr_orchestrator/adapters/prowlarr.py",
+        "tests/adapters/test_prowlarr.py",
+        "tests/fixtures/prowlarr/*",
+        "tests/integration/test_prowlarr_lab.py"
+      ],
+      "no_diff": false,
+      "verification": {
+        "command": "148_tests_passed,public_safety_186,scripts_check_passed,go_validate_passed,diff_check_passed,py_compile_passed",
+        "result": "148_tests_passed,public_safety_186,scripts_check_passed,go_validate_passed,diff_check_passed,py_compile_passed"
+      },
+      "runtime": {
+        "agent": "hermes",
+        "runtime": "prowlarr_2.5.2.5491_api_v1_3_GET_0_ports_cleanup_0_0_0_0",
+        "model": null,
+        "billing_mode": "unknown"
+      },
+      "usage": {
+        "schema": "go-workflow.usage-attribution.v1",
+        "runtime_kind": "prowlarr_2.5.2.5491_api_v1_3_GET_0_ports_cleanup_0_0_0_0",
+        "billing_mode": "unknown",
+        "owner": "hermes",
+        "model": null,
+        "token_estimate": null,
+        "api_equivalent_cost_usd": null,
+        "provider_invoice_cost_usd": null,
+        "cost_label": "api_equivalent_not_invoice_cost"
+      },
+      "review": {
+        "outcome": "verdict_A_hash_6bf2b3e265e7e58b45b8fc6add63ad9f662bf8270eddebbfcfe5a25aa051394d_12_paths_74_adversarial_probes",
+        "skip_reason": null
+      }
+    }
+  ],
+  "depends_on": [
+    "transport-01-build-shared-readonly-transport"
+  ],
+  "priority": 12,
+  "delivery": "product_implementation_backlog",
+  "order": 12
+}

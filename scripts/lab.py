@@ -1065,6 +1065,152 @@ print(json.dumps({
     return emit(result)
 
 
+def test_prowlarr_adapter() -> int:
+    lab_id, project, root = create_runtime()
+    env = lab_env(lab_id, project, root)
+    completed = False
+    result: dict[str, object]
+    try:
+        from lab.host.secrets import build_arr_config
+
+        credential_value = secrets.token_hex(16)
+        credential_name = "prowlarr-api-key"
+        secret_path = write_secret(root, credential_name, value=credential_value)
+        config_root = root / "config" / "prowlarr"
+        data_root = root / "data"
+        config_root.mkdir(parents=True, mode=0o700)
+        data_root.mkdir(mode=0o755)
+        write_private_text(
+            config_root / "config.xml",
+            build_arr_config(credential_value, 9696),
+            911,
+            1001,
+        )
+        assign_owner(config_root, 911, 1001, recursive=True)
+        assign_owner(data_root, 911, 1001, recursive=True, directory_mode=0o755)
+        run(
+            compose_command("--profile", "services", "up", "-d", "--wait", "prowlarr"),
+            env=env,
+        )
+        service_rows = run(
+            [
+                "docker", "ps", "--filter", f"label=com.docker.compose.project={project}",
+                "--format", "{{.Label \"com.docker.compose.service\"}}={{.ID}}",
+            ]
+        ).stdout.splitlines()
+        services = dict(row.split("=", 1) for row in service_rows if "=" in row)
+        if set(services) != {"prowlarr"}:
+            raise LabError("prowlarr adapter probe started an unexpected service set")
+        verify_scenario_project_authority(project, lab_id, root, {"prowlarr"})
+        inspection = json.loads(run(["docker", "inspect", services["prowlarr"]]).stdout)[0]
+        host_config = inspection["HostConfig"]
+        if (
+            host_config.get("Privileged")
+            or "ALL" not in (host_config.get("CapDrop") or [])
+            or not host_config.get("ReadonlyRootfs")
+        ):
+            raise LabError("prowlarr adapter service security boundary is invalid")
+        ports = inspection["NetworkSettings"].get("Ports") or {}
+        if any(value for value in ports.values()):
+            raise LabError("prowlarr adapter service published a host port")
+
+        probe = r'''
+import json
+from pathlib import Path
+from arr_orchestrator.adapters.prowlarr import ProwlarrAdapter
+from arr_orchestrator.config import ServiceEndpoint
+from arr_orchestrator.credentials import FileCredentialResolver
+from arr_orchestrator.transport import ReadOnlyHttpTransport, TransportPolicy
+
+class CountingOpener:
+    def __init__(self, delegate):
+        self.delegate = delegate
+        self.methods = []
+
+    def open(self, request, *, timeout):
+        self.methods.append(request.get_method())
+        return self.delegate.open(request, timeout=timeout)
+
+resolver = FileCredentialResolver(Path('/run/secrets'), expected_uid=65532)
+endpoint = ServiceEndpoint('prowlarr', 'http://prowlarr:9696', 'file:prowlarr-api-key')
+policy = TransportPolicy(deadline_seconds=3, max_attempts=2)
+default_transport = ReadOnlyHttpTransport(
+    endpoint,
+    resolver,
+    policy=policy,
+    credential_header='X-Api-Key',
+    credential_prefix='',
+)
+opener = CountingOpener(default_transport.opener)
+transport = ReadOnlyHttpTransport(
+    endpoint,
+    resolver,
+    policy=policy,
+    opener=opener,
+    credential_header='X-Api-Key',
+    credential_prefix='',
+)
+snapshot = ProwlarrAdapter(transport).read_snapshot()
+print(json.dumps({
+    'schema': 'arr-orchestrator.lab-prowlarr-adapter-probe.v1',
+    'snapshot': snapshot.to_dict(),
+    'request_methods': opener.methods,
+    'read_only_requests': len(opener.methods),
+}, sort_keys=True))
+'''
+        controller = run(
+            compose_command(
+                "--profile", "isolation", "run", "--rm", "--build", "--no-deps",
+                "--volume", f"{secret_path}:/run/secrets/{credential_name}:ro",
+                "--entrypoint", "python3", "lab-controller", "-c", probe,
+            ),
+            env=env,
+            check=False,
+        )
+        if controller.returncode != 0:
+            raise LabError("prowlarr adapter controller probe failed")
+        payload = last_json_object(controller.stdout)
+        snapshot = payload.get("snapshot", {})
+        capabilities = snapshot.get("capabilities", {}) if isinstance(snapshot, dict) else {}
+        if capabilities.get("api_version") != 1:
+            raise LabError("prowlarr adapter API discovery failed")
+        if not str(capabilities.get("application_version", "")).startswith("2."):
+            raise LabError("prowlarr adapter application version is invalid")
+        if payload.get("read_only_requests") != 3:
+            raise LabError("prowlarr adapter performed an unexpected request count")
+        if payload.get("request_methods") != ["GET"] * 3:
+            raise LabError("prowlarr adapter performed a non-read-only request")
+        if credential_value in controller.stdout or credential_value in controller.stderr:
+            raise LabError("prowlarr adapter probe output exposed its credential")
+        result = {
+            "schema": "arr-orchestrator.lab-prowlarr-adapter-run.v1",
+            "lab_id": lab_id,
+            "ok": True,
+            "api_version": capabilities["api_version"],
+            "application_version": capabilities["application_version"],
+            "read_only_requests": payload["read_only_requests"],
+            "applications": len(snapshot.get("applications", [])),
+            "indexer_total": snapshot.get("indexers", {}).get("total"),
+            "indexer_enabled": snapshot.get("indexers", {}).get("enabled"),
+            "published_ports": 0,
+        }
+        completed = True
+    finally:
+        down = run(compose_down_command("services", "isolation"), env=env, check=False)
+        remaining_containers = run(
+            ["docker", "ps", "-aq", "--filter", f"label=com.docker.compose.project={project}"]
+        ).stdout.split()
+        remaining_networks = run(
+            ["docker", "network", "ls", "-q", "--filter", f"label=com.docker.compose.project={project}"]
+        ).stdout.split()
+        remaining_images = remaining_project_images(project)
+        if down.returncode != 0 or remaining_containers or remaining_networks or remaining_images:
+            finalize_runtime(root, lab_id, project, success=False)
+            raise LabError("bounded prowlarr adapter cleanup did not converge")
+        finalize_runtime(root, lab_id, project, success=completed)
+    return emit(result)
+
+
 def write_private_text(path: Path, content: str, uid: int, gid: int) -> None:
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(path.parent, 0o700)
@@ -1805,7 +1951,7 @@ def build_parser() -> argparse.ArgumentParser:
     test_parser.add_argument(
         "suite", choices=("isolation", "doubles", "bootstrap", "scenarios", "transport", "adapter")
     )
-    test_parser.add_argument("service", nargs="?", choices=("sonarr", "radarr"))
+    test_parser.add_argument("service", nargs="?", choices=("sonarr", "radarr", "prowlarr"))
     subparsers.add_parser("container-health-server")
     subparsers.add_parser("container-idle")
     return parser
@@ -1830,6 +1976,8 @@ def main(argv: list[str] | None = None) -> int:
                     return test_sonarr_adapter()
                 if args.service == "radarr":
                     return test_radarr_adapter()
+                if args.service == "prowlarr":
+                    return test_prowlarr_adapter()
                 raise LabError("adapter service is required")
             return test_isolation()
         if args.command == "container-health-server":

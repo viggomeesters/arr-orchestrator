@@ -1,0 +1,25 @@
+[
+  {
+    "id": 1,
+    "name": "Synthetic Sonarr",
+    "implementation": "Sonarr",
+    "implementationName": "Sonarr",
+    "syncLevel": "fullSync",
+    "tags": [10],
+    "fields": [
+      {"name": "baseUrl", "value": "http://private-sonarr.invalid"},
+      {"name": "apiKey", "value": "private-application-key-canary"}
+    ]
+  },
+  {
+    "id": 2,
+    "name": "Synthetic Radarr",
+    "implementation": "Radarr",
+    "implementationName": "Radarr",
+    "syncLevel": "addOnly",
+    "tags": [],
+    "fields": [
+      {"name": "baseUrl", "value": "http://private-radarr.invalid"}
+    ]
+  }
+]

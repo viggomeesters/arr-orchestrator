@@ -45,6 +45,8 @@ One conventional final LF is accepted and removed. The returned `SecretValue` is
 
 `ReadOnlyHttpTransport` supports JSON `GET` and data-free `HEAD`. A successful `HEAD` returns an empty object and never exposes response headers. `POST`, `PUT`, `PATCH`, `DELETE`, and other methods fail with `MUTATION_DISABLED` before network I/O.
 
+Credential placement is restricted to two fixed profiles: bearer authorization and the `X-Api-Key` header. Header names and prefixes are validated at construction. Arbitrary headers such as `Host` or `Cookie`, mismatched schemes, and control characters are rejected before credential resolution or network I/O.
+
 Each request enforces:
 
 - the endpoint's exact configured origin;
@@ -87,11 +89,14 @@ Current codes include:
 - `CREDENTIAL_INVALID`
 - `DEADLINE_EXCEEDED`
 - `HTTP_STATUS_INVALID`
+- `RESOURCE_NOT_FOUND`
 - `CONTENT_TYPE_INVALID`
 - `RESPONSE_TOO_LARGE`
 - `JSON_INVALID`
 - `PRIVATE_DATA_REDACTED`
 - `AUTH_FAILED`
+
+HTTP `401` and `403` become `AUTH_FAILED`; `404` becomes `RESOURCE_NOT_FOUND`. This lets adapters distinguish a missing versioned API resource from an authentication failure without exposing response bodies, reason phrases, URLs, or headers.
 
 ## qBittorrent authentication exception
 

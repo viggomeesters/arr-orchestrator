@@ -81,6 +81,57 @@ class TransportTests(unittest.TestCase):
         self.assertEqual({}, head_client.request_json("HEAD", "/api/v1/probe"))
         self.assertEqual("HEAD", head_opener.requests[0][0].method)
 
+    def test_supports_a_validated_service_specific_credential_header(self):
+        opener = Opener([Response()])
+        transport = ReadOnlyHttpTransport(
+            self.endpoint,
+            Resolver(),
+            opener=opener,
+            credential_header="X-Api-Key",
+            credential_prefix="",
+        )
+        self.assertEqual({"status": "ok"}, transport.get_json("/api/v3/system/status"))
+        request, _ = opener.requests[0]
+        self.assertEqual("synthetic-token", request.headers["X-api-key"])
+        self.assertNotIn("Authorization", request.headers)
+
+        for header, prefix in (("Bad\r\nHeader", ""), ("X-Api-Key", "bad\n")):
+            unopened = Opener([Response()])
+            with self.subTest(header=header, prefix=prefix), self.assertRaises(ValueError):
+                ReadOnlyHttpTransport(
+                    self.endpoint,
+                    Resolver(),
+                    opener=unopened,
+                    credential_header=header,
+                    credential_prefix=prefix,
+                )
+            self.assertEqual([], unopened.requests)
+
+        for header, prefix in (("Host", ""), ("Cookie", ""), ("Authorization", ""), ("X-Api-Key", "Bearer ")):
+            unopened = Opener([Response()])
+            with self.subTest(header=header, prefix=prefix), self.assertRaises(ValueError):
+                ReadOnlyHttpTransport(
+                    self.endpoint,
+                    Resolver(),
+                    opener=unopened,
+                    credential_header=header,
+                    credential_prefix=prefix,
+                )
+            self.assertEqual([], unopened.requests)
+
+    def test_classifies_authentication_and_missing_resources_without_response_details(self):
+        for status, code in ((401, "AUTH_FAILED"), (403, "AUTH_FAILED"), (404, "RESOURCE_NOT_FOUND")):
+            failure = urllib.error.HTTPError(
+                "https://service.test/private", status, "private-status-canary", {}, None
+            )
+            client, _ = self.client([failure], max_attempts=1)
+            with self.subTest(status=status), self.assertRaises(TransportFailure) as caught:
+                client.get_json("/private")
+            self.assertEqual(code, caught.exception.code)
+            self.assertNotIn("private-status-canary", repr(caught.exception) + str(caught.exception))
+            self.assertIsNone(caught.exception.__cause__)
+            self.assertIsNone(caught.exception.__context__)
+
     def test_default_opener_ignores_all_ambient_proxies(self):
         with mock.patch.dict(
             os.environ,

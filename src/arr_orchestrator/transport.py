@@ -21,6 +21,8 @@ SENSITIVE_KEYS = {
     "secret", "set-cookie", "token", "uri", "url",
 }
 RETRYABLE_STATUS = {429, 502, 503, 504}
+HTTP_HEADER_NAME = re.compile(r"[!#$%&'*+.^_`|~0-9A-Za-z-]+")
+CREDENTIAL_HEADERS = {"Authorization": "Bearer ", "X-Api-Key": ""}
 
 
 class TransportFailure(RuntimeError):
@@ -161,13 +163,31 @@ class ReadOnlyHttpTransport:
         opener: Any | None = None,
         clock: Callable[[], float] = time.monotonic,
         sleeper: Callable[[float], None] = time.sleep,
+        credential_header: str = "Authorization",
+        credential_prefix: str = "Bearer ",
     ):
+        if (
+            not isinstance(credential_header, str)
+            or HTTP_HEADER_NAME.fullmatch(credential_header) is None
+            or credential_header not in CREDENTIAL_HEADERS
+        ):
+            raise ValueError("credential header name is invalid")
+        if (
+            not isinstance(credential_prefix, str)
+            or len(credential_prefix) > 32
+            or any(ord(char) < 0x20 or ord(char) > 0x7E for char in credential_prefix)
+        ):
+            raise ValueError("credential header prefix is invalid")
+        if credential_prefix != CREDENTIAL_HEADERS[credential_header]:
+            raise ValueError("credential header scheme is invalid")
         self.endpoint = endpoint
         self.resolver = resolver
         self.policy = policy or TransportPolicy()
         self.opener = opener or _default_opener(self.policy.tls_verify)
         self.clock = clock
         self.sleeper = sleeper
+        self.credential_header = credential_header
+        self.credential_prefix = credential_prefix
 
     def get_json(self, path: str) -> dict[str, Any] | list[Any]:
         return self.request_json("GET", path)
@@ -200,7 +220,10 @@ class ReadOnlyHttpTransport:
                 raise TransportFailure("DEADLINE_EXCEEDED", attempts=attempt - 1)
             request = urllib.request.Request(
                 self.endpoint.base_url + safe_path,
-                headers={"Accept": "application/json", "Authorization": f"Bearer {credential_text}"},
+                headers={
+                    "Accept": "application/json",
+                    self.credential_header: f"{self.credential_prefix}{credential_text}",
+                },
                 method=method,
             )
             try:
@@ -242,8 +265,16 @@ class ReadOnlyHttpTransport:
             except urllib.error.HTTPError as error:
                 if 300 <= error.code < 400:
                     raise TransportFailure("REDIRECT_DENIED", attempts=attempt) from None
+                if error.code in {401, 403}:
+                    code = "AUTH_FAILED"
+                elif error.code == 404:
+                    code = "RESOURCE_NOT_FOUND"
+                elif error.code in RETRYABLE_STATUS:
+                    code = "SERVICE_UNREACHABLE"
+                else:
+                    code = "HTTP_STATUS_INVALID"
                 last_failure = TransportFailure(
-                    "SERVICE_UNREACHABLE" if error.code in RETRYABLE_STATUS else "HTTP_STATUS_INVALID",
+                    code,
                     retryable=error.code in RETRYABLE_STATUS,
                     attempts=attempt,
                 )

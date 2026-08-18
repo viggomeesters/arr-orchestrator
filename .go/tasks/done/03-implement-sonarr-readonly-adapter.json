@@ -1,0 +1,108 @@
+{
+  "schema": "go-workflow.repo-local.task.v1",
+  "kind": "task",
+  "execution_mode": "agent",
+  "shareable_delivery": "none",
+  "id": "03-implement-sonarr-readonly-adapter",
+  "project": "arr-orchestrator",
+  "status": "done",
+  "summary": "Implement the read-only Sonarr adapter",
+  "description": "Add API version discovery and normalized read-only access to system status, root folders, download clients, quality profiles, and queue summaries using synthetic responses.",
+  "scope": {
+    "read": [
+      "schemas/**",
+      "src/**",
+      "docs/**"
+    ],
+    "modify": [
+      "src/arr_orchestrator/adapters/__init__.py",
+      "src/arr_orchestrator/adapters/sonarr.py",
+      "src/arr_orchestrator/transport.py",
+      "tests/adapters/test_sonarr.py",
+      "tests/fixtures/sonarr/**",
+      "tests/transport/test_transport.py",
+      "docs/adapters/sonarr.md",
+      "docs/http-transport.md",
+      "tests/integration/test_sonarr_lab.py",
+      "scripts/lab.py"
+    ]
+  },
+  "acceptance": [
+    "Unsupported API versions fail with a typed blocker.",
+    "Secrets and request headers are redacted from all output.",
+    "Synthetic fixtures prove normalized capability and configuration output.",
+    "The adapter reuses transport-01 for endpoint policy, credentials, retries, typed failures, and redaction rather than implementing a private HTTP stack.",
+    "Fast synthetic fixture tests and a focused real-container sonarr lane both pass.",
+    "Read-only operation performs no domain mutation; any required authentication session is explicitly classified and side-effect-free."
+  ],
+  "verification": [
+    "python3 -m unittest tests.adapters.test_sonarr",
+    "python3 scripts/lab.py test adapter sonarr",
+    "bash scripts/check.sh"
+  ],
+  "claim": {
+    "agent": "hermes",
+    "claimed_at": "2026-08-18T12:05:07+02:00"
+  },
+  "work_status": "completed",
+  "review_status": "review",
+  "review_history": [],
+  "evidence": [
+    {
+      "schema": "go-workflow.finish-evidence.v1",
+      "created_at": "2026-08-18T12:42:43+02:00",
+      "task_id": "03-implement-sonarr-readonly-adapter",
+      "agent": "hermes",
+      "summary": "changed_files=docs/adapters/sonarr.md,docs/http-transport.md,scripts/lab.py,src/arr_orchestrator/adapters/__init__.py,src/arr_orchestrator/adapters/sonarr.py,src/arr_orchestrator/transport.py,tests/adapters/test_sonarr.py,tests/fixtures/sonarr/download-clients.json,tests/fixtures/sonarr/quality-profiles.json,tests/fixtures/sonarr/queue-page-1.json,tests/fixtures/sonarr/queue-page-2.json,tests/fixtures/sonarr/root-folders.json,tests/fixtures/sonarr/system-status.json,tests/integration/test_sonarr_lab.py,tests/transport/test_transport.py; verification=focused 20/20 + full 136/136 across 15 modules + public safety 163 paths + scripts/check.sh + git diff --check + ./go validate . + py_compile rc=0 + live Sonarr 4.0.19.2979 five physical HTTP requests all GET zero published ports residue 0/0/0/0; critic=Verdict A exact hash 22bf07dcd7280fb7d8801100eb3c6926578b069dfee8cbede4a9b12f79ea6849 18 paths no blockers reviewer modifications none; runtime=hermes-agent; billing_mode=subscription; owner=viggo",
+      "changed_files": [
+        "docs/adapters/sonarr.md",
+        "docs/http-transport.md",
+        "scripts/lab.py",
+        "src/arr_orchestrator/adapters/__init__.py",
+        "src/arr_orchestrator/adapters/sonarr.py",
+        "src/arr_orchestrator/transport.py",
+        "tests/adapters/test_sonarr.py",
+        "tests/fixtures/sonarr/download-clients.json",
+        "tests/fixtures/sonarr/quality-profiles.json",
+        "tests/fixtures/sonarr/queue-page-1.json",
+        "tests/fixtures/sonarr/queue-page-2.json",
+        "tests/fixtures/sonarr/root-folders.json",
+        "tests/fixtures/sonarr/system-status.json",
+        "tests/integration/test_sonarr_lab.py",
+        "tests/transport/test_transport.py"
+      ],
+      "no_diff": false,
+      "verification": {
+        "command": "focused 20/20 + full 136/136 across 15 modules + public safety 163 paths + scripts/check.sh + git diff --check + ./go validate . + py_compile rc=0 + live Sonarr 4.0.19.2979 five physical HTTP requests all GET zero published ports residue 0/0/0/0",
+        "result": "focused 20/20 + full 136/136 across 15 modules + public safety 163 paths + scripts/check.sh + git diff --check + ./go validate . + py_compile rc=0 + live Sonarr 4.0.19.2979 five physical HTTP requests all GET zero published ports residue 0/0/0/0"
+      },
+      "runtime": {
+        "agent": "hermes",
+        "runtime": "hermes-agent",
+        "model": null,
+        "billing_mode": "subscription"
+      },
+      "usage": {
+        "schema": "go-workflow.usage-attribution.v1",
+        "runtime_kind": "hermes-agent",
+        "billing_mode": "subscription",
+        "owner": "viggo",
+        "model": null,
+        "token_estimate": null,
+        "api_equivalent_cost_usd": null,
+        "provider_invoice_cost_usd": null,
+        "cost_label": "api_equivalent_not_invoice_cost"
+      },
+      "review": {
+        "outcome": "Verdict A exact hash 22bf07dcd7280fb7d8801100eb3c6926578b069dfee8cbede4a9b12f79ea6849 18 paths no blockers reviewer modifications none",
+        "skip_reason": null
+      }
+    }
+  ],
+  "depends_on": [
+    "transport-01-build-shared-readonly-transport"
+  ],
+  "priority": 10,
+  "delivery": "product_implementation_backlog",
+  "order": 10
+}

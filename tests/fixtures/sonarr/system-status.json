@@ -1,0 +1,9 @@
+{
+  "appName": "Sonarr",
+  "version": "4.0.19.2979",
+  "branch": "main",
+  "runtimeVersion": "8.0.20",
+  "osName": "debian",
+  "startupPath": "/app/sonarr/bin",
+  "urlBase": ""
+}

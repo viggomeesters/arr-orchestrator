@@ -1,3 +1,11 @@
+from .qbittorrent import (
+    QbittorrentAdapter,
+    QbittorrentAdapterFailure,
+    QbittorrentCapabilities,
+    QbittorrentCategory,
+    QbittorrentQueueSummary,
+    QbittorrentSnapshot,
+)
 from .prowlarr import (
     ProwlarrAdapter,
     ProwlarrAdapterFailure,
@@ -31,6 +39,12 @@ from .sonarr import (
 )
 
 __all__ = [
+    "QbittorrentAdapter",
+    "QbittorrentAdapterFailure",
+    "QbittorrentCapabilities",
+    "QbittorrentCategory",
+    "QbittorrentQueueSummary",
+    "QbittorrentSnapshot",
     "ProwlarrAdapter",
     "ProwlarrAdapterFailure",
     "ProwlarrApplication",

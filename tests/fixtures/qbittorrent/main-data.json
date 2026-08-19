@@ -1,0 +1,9 @@
+{
+  "rid": 0,
+  "full_update": true,
+  "torrents": {
+    "private-hash-one": {"name": "Private Download One", "state": "downloading", "category": "arr-lab", "save_path": "/private/item/one"},
+    "private-hash-two": {"name": "Private Download Two", "state": "pausedDL", "category": "manual", "save_path": "/private/item/two"}
+  },
+  "torrents_removed": []
+}

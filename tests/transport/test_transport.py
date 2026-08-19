@@ -16,6 +16,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from arr_orchestrator.config import ServiceEndpoint
 from arr_orchestrator.credentials import CredentialError, SecretValue
 from arr_orchestrator.transport import (
+    QbittorrentReadOnlyTransport,
     QbittorrentSession,
     ReadOnlyHttpTransport,
     TransportFailure,
@@ -301,6 +302,65 @@ class TransportTests(unittest.TestCase):
                 opener=Opener([Response(body=b"Ok.", content_type="text/plain")]),
                 clock=lambda: next(readings),
             )
+
+    def test_qbittorrent_api_key_transport_is_get_only_and_opaque(self):
+        credential = SecretValue("private-api-key")
+        opener = Opener([
+            Response(body=b"5.2.3", content_type="text/plain"),
+            Response(body=b'{"rid":0,"torrents":{}}'),
+        ])
+        transport = QbittorrentReadOnlyTransport(
+            ServiceEndpoint("qbit", "https://qbit.test", "file:unused"), credential, opener=opener
+        )
+        self.assertEqual("5.2.3", transport.get_text("/api/v2/app/version"))
+        self.assertEqual({"rid": 0, "torrents": {}}, transport.get_json("/api/v2/sync/maindata"))
+        self.assertEqual(["GET", "GET"], [request.method for request, _ in opener.requests])
+        self.assertEqual(
+            ["Bearer private-api-key", "Bearer private-api-key"],
+            [request.headers["Authorization"] for request, _ in opener.requests],
+        )
+        self.assertNotIn("private-api-key", repr(transport) + repr(credential))
+        with self.assertRaisesRegex(TransportFailure, "MUTATION_DISABLED"):
+            transport.request_json("POST", "/api/v2/torrents/delete")
+
+    def test_qbittorrent_transport_rejects_wrong_content_type_and_text_secret(self):
+        endpoint = ServiceEndpoint("qbit", "https://qbit.test", "file:unused")
+        credential = SecretValue("private-api-key")
+        with self.assertRaisesRegex(TransportFailure, "CONTENT_TYPE_INVALID"):
+            QbittorrentReadOnlyTransport(
+                endpoint,
+                credential,
+                opener=Opener([Response(body=b"5.2.3", content_type="application/json")]),
+            ).get_text("/api/v2/app/version")
+        with self.assertRaisesRegex(TransportFailure, "PRIVATE_DATA_REDACTED"):
+            QbittorrentReadOnlyTransport(
+                endpoint,
+                credential,
+                opener=Opener([Response(body=b"private-api-key", content_type="text/plain")]),
+            ).get_text("/api/v2/app/version")
+
+    def test_qbittorrent_transport_requires_secret_value(self):
+        class RevealOnly:
+            def reveal(self):
+                return "not-a-secret-value"
+
+        with self.assertRaises(TypeError):
+            QbittorrentReadOnlyTransport(
+                ServiceEndpoint("qbit", "https://qbit.test", "file:unused"),
+                RevealOnly(),
+                opener=Opener([]),
+            )
+
+    def test_transport_policy_rejects_non_integral_and_non_finite_bounds(self):
+        invalid = (
+            {"max_response_bytes": float("inf")},
+            {"max_response_bytes": float("nan")},
+            {"max_attempts": 2.5},
+            {"max_attempts": True},
+        )
+        for values in invalid:
+            with self.subTest(values=values), self.assertRaises(ValueError):
+                TransportPolicy(**values)
 
     def test_tls_certificate_failure_is_typed_and_never_retried(self):
         failure = urllib.error.URLError(ssl.SSLCertVerificationError("private-cert-canary"))

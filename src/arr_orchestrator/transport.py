@@ -49,6 +49,18 @@ class TransportPolicy:
 
     def __post_init__(self) -> None:
         if (
+            isinstance(self.deadline_seconds, bool)
+            or not isinstance(self.deadline_seconds, (int, float))
+            or isinstance(self.retry_backoff_seconds, bool)
+            or not isinstance(self.retry_backoff_seconds, (int, float))
+            or isinstance(self.max_response_bytes, bool)
+            or not isinstance(self.max_response_bytes, int)
+            or isinstance(self.max_attempts, bool)
+            or not isinstance(self.max_attempts, int)
+            or not isinstance(self.tls_verify, bool)
+        ):
+            raise ValueError("transport policy types are invalid")
+        if (
             not math.isfinite(self.deadline_seconds)
             or self.deadline_seconds <= 0
             or self.max_response_bytes < 1
@@ -77,6 +89,123 @@ class QbittorrentSession:
         return "QbittorrentSession('[REDACTED]')"
 
     __str__ = __repr__
+
+
+class QbittorrentReadOnlyTransport:
+    """Opaque API-key qBittorrent transport restricted to same-origin GET reads."""
+
+    def __init__(
+        self,
+        endpoint: ServiceEndpoint,
+        credential: SecretValue,
+        *,
+        policy: TransportPolicy | None = None,
+        opener: Any | None = None,
+        clock: Callable[[], float] = time.monotonic,
+        sleeper: Callable[[float], None] = time.sleep,
+    ) -> None:
+        if not isinstance(credential, SecretValue):
+            raise TypeError("credential must be SecretValue")
+        self.endpoint = endpoint
+        self.credential = credential
+        self.policy = policy or TransportPolicy()
+        self.opener = opener or _default_opener(self.policy.tls_verify)
+        self.clock = clock
+        self.sleeper = sleeper
+
+    def __repr__(self) -> str:
+        return f"QbittorrentReadOnlyTransport(service={self.endpoint.service_id!r}, credential=[REDACTED])"
+
+    def get_json(self, path: str) -> dict[str, Any] | list[Any]:
+        return self.request_json("GET", path)
+
+    def get_text(self, path: str) -> str:
+        value = self._request("GET", path, expected="text")
+        assert isinstance(value, str)
+        return value
+
+    def request_json(self, method: str, path: str) -> dict[str, Any] | list[Any]:
+        value = self._request(method, path, expected="json")
+        assert isinstance(value, (dict, list))
+        return value
+
+    def _request(self, method: str, path: str, *, expected: str) -> object:
+        if method.upper() != "GET":
+            raise TransportFailure("MUTATION_DISABLED")
+        safe_path = _safe_path(path)
+        deadline = self.clock() + self.policy.deadline_seconds
+        last_failure: TransportFailure | None = None
+        for attempt in range(1, self.policy.max_attempts + 1):
+            remaining = deadline - self.clock()
+            if remaining <= 0:
+                raise TransportFailure("DEADLINE_EXCEEDED", attempts=attempt - 1)
+            request = urllib.request.Request(
+                self.endpoint.base_url + safe_path,
+                headers={
+                    "Accept": "application/json, text/plain",
+                    "Authorization": f"Bearer {self.credential.reveal()}",
+                },
+                method="GET",
+            )
+            try:
+                with self.opener.open(request, timeout=remaining) as response:
+                    if self.clock() >= deadline:
+                        raise TransportFailure("DEADLINE_EXCEEDED", attempts=attempt)
+                    status = int(response.status)
+                    if status in RETRYABLE_STATUS:
+                        raise TransportFailure("SERVICE_UNREACHABLE", retryable=True, attempts=attempt)
+                    if not 200 <= status < 300:
+                        raise TransportFailure("HTTP_STATUS_INVALID", attempts=attempt)
+                    content_type = response.headers.get("Content-Type", "").partition(";")[0].strip().lower()
+                    if expected == "json" and content_type != "application/json":
+                        raise TransportFailure("CONTENT_TYPE_INVALID", attempts=attempt)
+                    if expected == "text" and content_type != "text/plain":
+                        raise TransportFailure("CONTENT_TYPE_INVALID", attempts=attempt)
+                    body = response.read(self.policy.max_response_bytes + 1)
+                    if self.clock() >= deadline:
+                        raise TransportFailure("DEADLINE_EXCEEDED", attempts=attempt)
+                    if len(body) > self.policy.max_response_bytes:
+                        raise TransportFailure("RESPONSE_TOO_LARGE", attempts=attempt)
+                    if expected == "text":
+                        try:
+                            text = body.decode("utf-8")
+                        except UnicodeDecodeError:
+                            raise TransportFailure("TEXT_INVALID", attempts=attempt) from None
+                        if not text or len(text) > 256 or any(ord(char) < 0x20 for char in text):
+                            raise TransportFailure("TEXT_INVALID", attempts=attempt)
+                        if _contains_sensitive_key(text, (self.credential.reveal(),)):
+                            raise TransportFailure("PRIVATE_DATA_REDACTED", attempts=attempt)
+                        return text
+                    try:
+                        parsed = json.loads(body)
+                    except (UnicodeDecodeError, json.JSONDecodeError):
+                        raise TransportFailure("JSON_INVALID", attempts=attempt) from None
+                    if not isinstance(parsed, (dict, list)):
+                        raise TransportFailure("JSON_INVALID", attempts=attempt)
+                    if _contains_sensitive_key(parsed, (self.credential.reveal(),)):
+                        raise TransportFailure("PRIVATE_DATA_REDACTED", attempts=attempt)
+                    return parsed
+            except urllib.error.HTTPError as error:
+                if 300 <= error.code < 400:
+                    raise TransportFailure("REDIRECT_DENIED", attempts=attempt) from None
+                code = "AUTH_FAILED" if error.code in {401, 403} else "RESOURCE_NOT_FOUND" if error.code == 404 else "SERVICE_UNREACHABLE" if error.code in RETRYABLE_STATUS else "HTTP_STATUS_INVALID"
+                last_failure = TransportFailure(code, retryable=error.code in RETRYABLE_STATUS, attempts=attempt)
+            except (TimeoutError, socket.timeout):
+                last_failure = TransportFailure("DEADLINE_EXCEEDED", retryable=True, attempts=attempt)
+            except urllib.error.URLError as error:
+                code = "TLS_VERIFICATION_FAILED" if isinstance(error.reason, ssl.SSLError) else "DEADLINE_EXCEEDED" if isinstance(error.reason, (TimeoutError, socket.timeout)) else "SERVICE_UNREACHABLE"
+                last_failure = TransportFailure(code, retryable=code != "TLS_VERIFICATION_FAILED", attempts=attempt)
+            except ssl.SSLError:
+                last_failure = TransportFailure("TLS_VERIFICATION_FAILED", attempts=attempt)
+            except OSError:
+                last_failure = TransportFailure("SERVICE_UNREACHABLE", retryable=True, attempts=attempt)
+            except TransportFailure as error:
+                last_failure = error
+            if last_failure is None or not last_failure.retryable or attempt >= self.policy.max_attempts:
+                raise last_failure or TransportFailure("SERVICE_UNREACHABLE", attempts=attempt)
+            self.sleeper(min(self.policy.retry_backoff_seconds, max(0.0, deadline - self.clock())))
+        raise last_failure or TransportFailure("SERVICE_UNREACHABLE")
+
 
 
 def _default_opener(tls_verify: bool):

@@ -1211,6 +1211,134 @@ print(json.dumps({
     return emit(result)
 
 
+def test_qbittorrent_adapter() -> int:
+    lab_id, project, root = create_runtime()
+    env = lab_env(lab_id, project, root)
+    completed = False
+    result: dict[str, object]
+    try:
+        from lab.host.secrets import build_qbittorrent_config
+
+        username = "labadmin"
+        login_material = secrets.token_urlsafe(32)
+        bearer_material = "qbt_" + secrets.token_hex(14)
+        api_path = write_secret(root, "qbittorrent-bearer", value=bearer_material)
+        config_root = root / "config" / "qbittorrent" / "qBittorrent"
+        data_root = root / "data"
+        config_root.mkdir(parents=True, mode=0o700)
+        data_root.mkdir(mode=0o755)
+        write_private_text(
+            config_root / "qBittorrent.conf",
+            build_qbittorrent_config(username, login_material, bearer_material),
+            911,
+            1001,
+        )
+        assign_owner(config_root.parent, 911, 1001, recursive=True)
+        assign_owner(data_root, 911, 1001, recursive=True, directory_mode=0o755)
+        run(
+            compose_command("--profile", "services", "up", "-d", "--wait", "qbittorrent"),
+            env=env,
+        )
+        service_rows = run(
+            [
+                "docker", "ps", "--filter", f"label=com.docker.compose.project={project}",
+                "--format", "{{.Label \"com.docker.compose.service\"}}={{.ID}}",
+            ]
+        ).stdout.splitlines()
+        services = dict(row.split("=", 1) for row in service_rows if "=" in row)
+        if set(services) != {"qbittorrent"}:
+            raise LabError("qbittorrent adapter probe started an unexpected service set")
+        verify_scenario_project_authority(project, lab_id, root, {"qbittorrent"})
+        inspection = json.loads(run(["docker", "inspect", services["qbittorrent"]]).stdout)[0]
+        host_config = inspection["HostConfig"]
+        if (
+            host_config.get("Privileged")
+            or "ALL" not in (host_config.get("CapDrop") or [])
+            or not host_config.get("ReadonlyRootfs")
+        ):
+            raise LabError("qbittorrent adapter service security boundary is invalid")
+        ports = inspection["NetworkSettings"].get("Ports") or {}
+        if any(value for value in ports.values()):
+            raise LabError("qbittorrent adapter service published a host port")
+
+        probe = r'''
+import json
+from pathlib import Path
+from arr_orchestrator.adapters.qbittorrent import QbittorrentAdapter
+from arr_orchestrator.config import ServiceEndpoint
+from arr_orchestrator.credentials import FileCredentialResolver
+from arr_orchestrator.transport import QbittorrentReadOnlyTransport, TransportPolicy, _default_opener
+
+class CountingOpener:
+    def __init__(self, delegate): self.delegate=delegate; self.methods=[]
+    def open(self, request, timeout=None):
+        self.methods.append(request.get_method())
+        return self.delegate.open(request, timeout=timeout)
+resolver=FileCredentialResolver(Path('/run/secrets'), expected_uid=65532)
+endpoint=ServiceEndpoint('qbittorrent','http://qbittorrent:8080','file:unused')
+policy=TransportPolicy(deadline_seconds=3,max_attempts=2)
+opener=CountingOpener(_default_opener(True))
+try:
+    transport=QbittorrentReadOnlyTransport(endpoint,resolver.resolve('file:qbittorrent-bearer'),policy=policy,opener=opener)
+    snapshot=QbittorrentAdapter(transport).read_snapshot()
+    print(json.dumps({'schema':'arr-orchestrator.lab-qbittorrent-adapter-probe.v1','snapshot':snapshot.to_dict(),'request_methods':opener.methods},sort_keys=True))
+except Exception as error:
+    print(json.dumps({'schema':'arr-orchestrator.lab-qbittorrent-adapter-probe-error.v1','error':type(error).__name__,'code':getattr(error,'code',None),'request_methods':opener.methods},sort_keys=True))
+    raise SystemExit(1)
+'''
+        controller = run(
+            compose_command(
+                "--profile", "isolation", "run", "--rm", "--build", "--no-deps",
+                "--volume", f"{api_path}:/run/secrets/qbittorrent-bearer:ro",
+                "--entrypoint", "python3", "lab-controller", "-c", probe,
+            ),
+            env=env,
+            check=False,
+        )
+        if controller.returncode != 0:
+            diagnostic = last_json_object(controller.stdout)
+            code = diagnostic.get("code") or diagnostic.get("error") or "UNKNOWN"
+            raise LabError(f"qbittorrent adapter controller probe failed: {code}")
+        payload = last_json_object(controller.stdout)
+        snapshot = payload.get("snapshot", {})
+        capabilities = snapshot.get("capabilities", {}) if isinstance(snapshot, dict) else {}
+        methods = payload.get("request_methods")
+        if not str(capabilities.get("application_version", "")).lstrip("v").startswith("5."):
+            raise LabError("qbittorrent adapter application version is invalid")
+        if methods != ["GET"] * 4:
+            raise LabError("qbittorrent adapter request contract is invalid")
+        output = controller.stdout + controller.stderr
+        if username in output or login_material in output or bearer_material in output:
+            raise LabError("qbittorrent adapter probe output exposed credential material")
+        result = {
+            "schema": "arr-orchestrator.lab-qbittorrent-adapter-run.v1",
+            "lab_id": lab_id,
+            "ok": True,
+            "application_version": capabilities["application_version"],
+            "webapi_version": capabilities["webapi_version"],
+            "authentication_requests": 0,
+            "read_only_requests": 4,
+            "categories": len(snapshot.get("categories", [])),
+            "queue_records": snapshot.get("queue", {}).get("total"),
+            "published_ports": 0,
+        }
+        completed = True
+    finally:
+        down = run(compose_down_command("services", "isolation"), env=env, check=False)
+        remaining_containers = run(
+            ["docker", "ps", "-aq", "--filter", f"label=com.docker.compose.project={project}"]
+        ).stdout.split()
+        remaining_networks = run(
+            ["docker", "network", "ls", "-q", "--filter", f"label=com.docker.compose.project={project}"]
+        ).stdout.split()
+        remaining_images = remaining_project_images(project)
+        if down.returncode != 0 or remaining_containers or remaining_networks or remaining_images:
+            finalize_runtime(root, lab_id, project, success=False)
+            raise LabError("bounded qbittorrent adapter cleanup did not converge")
+        finalize_runtime(root, lab_id, project, success=completed)
+    return emit(result)
+
+
 def write_private_text(path: Path, content: str, uid: int, gid: int) -> None:
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(path.parent, 0o700)
@@ -1951,7 +2079,9 @@ def build_parser() -> argparse.ArgumentParser:
     test_parser.add_argument(
         "suite", choices=("isolation", "doubles", "bootstrap", "scenarios", "transport", "adapter")
     )
-    test_parser.add_argument("service", nargs="?", choices=("sonarr", "radarr", "prowlarr"))
+    test_parser.add_argument(
+        "service", nargs="?", choices=("sonarr", "radarr", "prowlarr", "qbittorrent")
+    )
     subparsers.add_parser("container-health-server")
     subparsers.add_parser("container-idle")
     return parser
@@ -1978,6 +2108,8 @@ def main(argv: list[str] | None = None) -> int:
                     return test_radarr_adapter()
                 if args.service == "prowlarr":
                     return test_prowlarr_adapter()
+                if args.service == "qbittorrent":
+                    return test_qbittorrent_adapter()
                 raise LabError("adapter service is required")
             return test_isolation()
         if args.command == "container-health-server":

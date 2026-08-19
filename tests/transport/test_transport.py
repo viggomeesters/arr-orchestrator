@@ -6,6 +6,7 @@ import ssl
 import sys
 import unittest
 import urllib.error
+import urllib.parse
 import urllib.request
 from unittest import mock
 from pathlib import Path
@@ -350,6 +351,89 @@ class TransportTests(unittest.TestCase):
                 RevealOnly(),
                 opener=Opener([]),
             )
+
+    def test_jellyfin_credential_header_profile_is_allowlisted(self):
+        endpoint = ServiceEndpoint("jellyfin", "http://jellyfin:8096", "file:jellyfin-access")
+        opener = Opener([Response(body=b'[]')])
+        transport = ReadOnlyHttpTransport(
+            endpoint,
+            Resolver(),
+            opener=opener,
+            credential_header="X-Emby-Token",
+            credential_prefix="",
+        )
+        self.assertEqual([], transport.get_json("/Library/VirtualFolders"))
+        self.assertEqual("synthetic-token", opener.requests[0][0].headers["X-emby-token"])
+        with self.assertRaises(ValueError):
+            ReadOnlyHttpTransport(
+                endpoint,
+                Resolver(),
+                credential_header="X-Jellyfin-Token",
+                credential_prefix="",
+            )
+
+    def test_jellyfin_public_info_is_allowlist_projected_inside_transport(self):
+        endpoint = ServiceEndpoint("jellyfin", "http://jellyfin:8096", "file:jellyfin-access")
+        opener = Opener([Response(body=b'{"Version":"10.11.11","StartupWizardCompleted":true,"LocalAddress":"http://private:8096","Id":"private-id"}')])
+        transport = ReadOnlyHttpTransport(
+            endpoint,
+            Resolver(),
+            opener=opener,
+            credential_header="X-Emby-Token",
+            credential_prefix="",
+        )
+        self.assertEqual(
+            {"Version": "10.11.11", "StartupWizardCompleted": True},
+            transport.get_json_fields(
+                "/System/Info/Public",
+                ("Version", "StartupWizardCompleted"),
+            ),
+        )
+        with self.assertRaises(ValueError):
+            transport.get_json_fields("/System/Info/Public", ("LocalAddress",))
+        for path, fields in (
+            ("/System/Info/Public", ("Version",)),
+            ("/System/Info", ("Version", "StartupWizardCompleted")),
+        ):
+            with self.assertRaises(ValueError):
+                transport.get_json_fields(path, fields)
+        unopened = Opener([])
+        raw = ReadOnlyHttpTransport(
+            endpoint,
+            Resolver(),
+            opener=unopened,
+            credential_header="X-Emby-Token",
+            credential_prefix="",
+        )
+        with self.assertRaisesRegex(TransportFailure, "FIELD_PROJECTION_REQUIRED"):
+            raw.get_json("/System/Info/Public")
+        deeply_encoded = "/System/Info"
+        for _ in range(40):
+            deeply_encoded = urllib.parse.quote(deeply_encoded, safe="")
+        for alias in (
+            "/System/Info",
+            "/System/Info.",
+            "/System/Info/Public?view=compact",
+            "/System/Info/Public/",
+            "/system/info/public",
+            "/System/Info/%50ublic",
+            "/System/Info/./Public",
+            "/System/Info/%2e/Public",
+            "/System//Info/Public",
+            "/System./Info./Public.",
+            "/System%252525252FInfo",
+            "/System/%2525252549nfo",
+            deeply_encoded,
+            "/prefix/../System/Info",
+            "/prefix/%2e%2e/System/Info/Public",
+            "/prefix/%252e%252e/System/Info",
+            "/prefix/%252E%252E/System/Info/Public",
+        ):
+            with self.assertRaisesRegex(TransportFailure, "FIELD_PROJECTION_REQUIRED"):
+                raw.get_json(alias)
+        with self.assertRaisesRegex(TransportFailure, "PATH_INVALID"):
+            raw.get_json("/" + "x" * 4096)
+        self.assertEqual([], unopened.requests)
 
     def test_transport_policy_rejects_non_integral_and_non_finite_bounds(self):
         invalid = (

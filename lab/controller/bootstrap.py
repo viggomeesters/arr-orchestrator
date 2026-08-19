@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import http.cookiejar
 import json
+import os
 import time
 import urllib.error
 import urllib.parse
@@ -280,7 +281,34 @@ def authenticate_jellyfin(client: HttpClient, values: dict[str, str]) -> str:
     return access_value
 
 
-def bootstrap_jellyfin() -> tuple[str, dict[str, Any]]:
+def write_access_output(path: Path, value: str) -> None:
+    if (
+        not isinstance(path, Path)
+        or not path.is_absolute()
+        or not path.parent.is_dir()
+        or path.parent.is_symlink()
+        or not isinstance(value, str)
+        or not value
+        or value != value.strip()
+        or any(ord(char) < 0x20 or ord(char) == 0x7F for char in value)
+    ):
+        raise BootstrapError("jellyfin access output is invalid")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(path, flags, 0o600)
+        try:
+            payload = value.encode("utf-8")
+            written = 0
+            while written < len(payload):
+                written += os.write(descriptor, payload[written:])
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+    except OSError:
+        raise BootstrapError("jellyfin access output cannot be created safely") from None
+
+
+def bootstrap_jellyfin(access_output: Path | None = None) -> tuple[str, dict[str, Any]]:
     values = read_credential("jellyfin")
     client = HttpClient("jellyfin", "http://jellyfin:8096")
     public = client.wait_json("/System/Info/Public", attempts=60)
@@ -316,6 +344,8 @@ def bootstrap_jellyfin() -> tuple[str, dict[str, Any]]:
                 break
             time.sleep(1)
     access_value = authenticate_jellyfin(client, values)
+    if access_output is not None:
+        write_access_output(access_output, access_value)
     authenticated = HttpClient("jellyfin", "http://jellyfin:8096", {"X-Emby-Token": access_value})
     authenticated.request("GET", "/System/Info")
     folders = authenticated.request("GET", "/Library/VirtualFolders")

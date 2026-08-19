@@ -1339,6 +1339,181 @@ except Exception as error:
     return emit(result)
 
 
+def test_jellyfin_adapter() -> int:
+    lab_id, project, root = create_runtime()
+    env = lab_env(lab_id, project, root)
+    completed = False
+    result: dict[str, object]
+    try:
+        layout, bundle, _mock_path, _mock_value = prepare_bootstrap_runtime(root)
+        session_root = root / "session"
+        session_root.mkdir(mode=0o755)
+        assign_owner(session_root, 65532, 65532, directory_mode=0o755)
+        access_path = session_root / "jellyfin-access"
+        run(
+            compose_command("--profile", "services", "up", "-d", "--wait", "jellyfin"),
+            env=env,
+        )
+        service_rows = run(
+            [
+                "docker", "ps", "--filter", f"label=com.docker.compose.project={project}",
+                "--format", "{{.Label \"com.docker.compose.service\"}}={{.ID}}",
+            ]
+        ).stdout.splitlines()
+        services = dict(row.split("=", 1) for row in service_rows if "=" in row)
+        if set(services) != {"jellyfin"}:
+            raise LabError("jellyfin adapter probe started an unexpected service set")
+        verify_scenario_project_authority(project, lab_id, root, {"jellyfin"})
+        inspection = json.loads(run(["docker", "inspect", services["jellyfin"]]).stdout)[0]
+        host_config = inspection["HostConfig"]
+        if (
+            host_config.get("Privileged")
+            or "ALL" not in (host_config.get("CapDrop") or [])
+            or not host_config.get("ReadonlyRootfs")
+        ):
+            raise LabError("jellyfin adapter service security boundary is invalid")
+        if any(value for value in (inspection["NetworkSettings"].get("Ports") or {}).values()):
+            raise LabError("jellyfin adapter service published a host port")
+
+        authenticate = r'''
+import contextlib,io,json,os
+from pathlib import Path
+from lab.controller.bootstrap import HttpClient,bootstrap_jellyfin
+calls=[]
+original=HttpClient.request
+def counted(self,method,path,*args,**kwargs):
+    calls.append((method.upper(),path))
+    return original(self,method,path,*args,**kwargs)
+HttpClient.request=counted
+stdout=io.StringIO(); stderr=io.StringIO()
+with contextlib.redirect_stdout(stdout),contextlib.redirect_stderr(stderr):
+    bootstrap_jellyfin(Path('/run/output/jellyfin-access'))
+opaque=Path('/run/output/jellyfin-access').read_text(encoding='utf-8')
+captured=stdout.getvalue()+stderr.getvalue()
+if opaque in captured:
+    raise SystemExit(2)
+posts=[path for method,path in calls if method=='POST']
+auth_posts=sum(path=='/Users/AuthenticateByName' for path in posts)
+setup_posts=len(posts)-auth_posts
+print(json.dumps({'schema':'arr-orchestrator.lab-jellyfin-auth.v1','auth_posts':auth_posts,'setup_posts':setup_posts},sort_keys=True))
+'''
+        auth_run = run(
+            compose_command(
+                "--profile", "isolation", "run", "--rm", "--build", "--no-deps",
+                "--volume", f"{bundle.files['jellyfin']}:/run/secrets/jellyfin-credential:ro",
+                "--volume", f"{session_root}:/run/output:rw",
+                "--entrypoint", "python3", "lab-controller", "-c", authenticate,
+            ),
+            env=env,
+            check=False,
+        )
+        if auth_run.returncode != 0 or not access_path.is_file():
+            raise LabError("jellyfin side-effect-free authentication bootstrap failed")
+        auth_metrics = last_json_object(auth_run.stdout)
+        auth_posts = auth_metrics.get("auth_posts")
+        setup_posts = auth_metrics.get("setup_posts")
+        if auth_posts != 1 or setup_posts != 4:
+            raise LabError("jellyfin bootstrap request classification is invalid")
+        if stat.S_IMODE(access_path.stat().st_mode) != 0o600 or access_path.stat().st_uid != 65532:
+            raise LabError("jellyfin ephemeral access file boundary is invalid")
+
+        probe = r'''
+import dataclasses,json
+from pathlib import Path
+from arr_orchestrator.adapters.jellyfin import JellyfinAdapter
+from arr_orchestrator.config import ServiceEndpoint
+from arr_orchestrator.credentials import FileCredentialResolver
+from arr_orchestrator.transport import ReadOnlyHttpTransport,TransportPolicy,_default_opener
+class CountingOpener:
+    def __init__(self,delegate): self.delegate=delegate; self.methods=[]
+    def open(self,request,timeout=None):
+        self.methods.append(request.get_method())
+        return self.delegate.open(request,timeout=timeout)
+resolver=FileCredentialResolver(Path('/run/secrets'),expected_uid=65532)
+endpoint=ServiceEndpoint('jellyfin','http://jellyfin:8096','file:jellyfin-access')
+opener=CountingOpener(_default_opener(True))
+try:
+    transport=ReadOnlyHttpTransport(endpoint,resolver,policy=TransportPolicy(deadline_seconds=3,max_attempts=2),opener=opener,credential_header='X-Emby-Token',credential_prefix='')
+    snapshot=JellyfinAdapter(transport).read_snapshot()
+    payload={'schema':'arr-orchestrator.lab-jellyfin-adapter-probe.v1','snapshot':dataclasses.asdict(snapshot),'request_methods':opener.methods}
+except Exception as error:
+    payload={'schema':'arr-orchestrator.lab-jellyfin-adapter-probe-error.v1','error':type(error).__name__,'code':str(error),'request_methods':opener.methods}
+encoded=json.dumps(payload,sort_keys=True)
+opaque=resolver.resolve('file:jellyfin-access').reveal()
+if opaque in encoded:
+    print(json.dumps({'schema':'arr-orchestrator.lab-jellyfin-adapter-probe-error.v1','error':'PRIVATE_DATA_REDACTED'},sort_keys=True))
+    raise SystemExit(1)
+print(encoded)
+if payload['schema'].endswith('-error.v1'):
+    raise SystemExit(1)
+'''
+        controller = run(
+            compose_command(
+                "--profile", "isolation", "run", "--rm", "--build", "--no-deps",
+                "--volume", f"{access_path}:/run/secrets/jellyfin-access:ro",
+                "--entrypoint", "python3", "lab-controller", "-c", probe,
+            ),
+            env=env,
+            check=False,
+        )
+        if controller.returncode != 0:
+            diagnostic = last_json_object(controller.stdout)
+            code = diagnostic.get("code") or diagnostic.get("error") or "UNKNOWN"
+            methods = diagnostic.get("request_methods")
+            raise LabError(f"jellyfin adapter controller probe failed: {code}; methods={methods}")
+        payload = last_json_object(controller.stdout)
+        snapshot = payload.get("snapshot", {})
+        capabilities = snapshot.get("capabilities", {}) if isinstance(snapshot, dict) else {}
+        methods = payload.get("request_methods")
+        if not str(capabilities.get("server_version", "")).startswith("10."):
+            raise LabError("jellyfin adapter server version is invalid")
+        if methods != ["GET"] * 3:
+            raise LabError("jellyfin adapter request contract is invalid")
+        output = auth_run.stdout + auth_run.stderr + controller.stdout + controller.stderr
+        for private in (
+            bundle.value("jellyfin", "username"),
+            bundle.value("jellyfin", "password"),
+        ):
+            if private in output:
+                raise LabError("jellyfin adapter probe output exposed credential material")
+        result = {
+            "schema": "arr-orchestrator.lab-jellyfin-adapter-run.v1",
+            "lab_id": lab_id,
+            "ok": True,
+            "server_version": capabilities["server_version"],
+            "setup_mutation_requests": setup_posts,
+            "authentication_requests": auth_posts,
+            "read_only_requests": 3,
+            "libraries": len(snapshot.get("libraries", [])),
+            "refresh_supported": snapshot.get("refresh", {}).get("supported"),
+            "published_ports": 0,
+        }
+        completed = True
+    finally:
+        down = run(compose_down_command("services", "isolation"), env=env, check=False)
+        remaining_containers = run(
+            ["docker", "ps", "-aq", "--filter", f"label=com.docker.compose.project={project}"]
+        ).stdout.split()
+        remaining_networks = run(
+            ["docker", "network", "ls", "-q", "--filter", f"label=com.docker.compose.project={project}"]
+        ).stdout.split()
+        remaining_volumes = run(
+            ["docker", "volume", "ls", "-q", "--filter", f"label=com.docker.compose.project={project}"]
+        ).stdout.split()
+        remaining_images = remaining_project_images(project)
+        if (
+            down.returncode != 0
+            or remaining_containers
+            or remaining_networks
+            or remaining_volumes
+            or remaining_images
+        ):
+            finalize_runtime(root, lab_id, project, success=False)
+            raise LabError("bounded jellyfin adapter cleanup did not converge")
+        finalize_runtime(root, lab_id, project, success=completed)
+    return emit(result)
+
+
 def write_private_text(path: Path, content: str, uid: int, gid: int) -> None:
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(path.parent, 0o700)
@@ -2080,7 +2255,7 @@ def build_parser() -> argparse.ArgumentParser:
         "suite", choices=("isolation", "doubles", "bootstrap", "scenarios", "transport", "adapter")
     )
     test_parser.add_argument(
-        "service", nargs="?", choices=("sonarr", "radarr", "prowlarr", "qbittorrent")
+        "service", nargs="?", choices=("sonarr", "radarr", "prowlarr", "qbittorrent", "jellyfin")
     )
     subparsers.add_parser("container-health-server")
     subparsers.add_parser("container-idle")
@@ -2110,6 +2285,8 @@ def main(argv: list[str] | None = None) -> int:
                     return test_prowlarr_adapter()
                 if args.service == "qbittorrent":
                     return test_qbittorrent_adapter()
+                if args.service == "jellyfin":
+                    return test_jellyfin_adapter()
                 raise LabError("adapter service is required")
             return test_isolation()
         if args.command == "container-health-server":

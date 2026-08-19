@@ -156,6 +156,18 @@ class BootstrapContractTests(unittest.TestCase):
         self.assertEqual("AppProfileId:GreaterThanValidator", diagnostic)
         self.assertNotIn("sensitive", diagnostic)
 
+    def test_access_output_is_exclusive_private_and_not_overwritten(self):
+        from lab.controller.bootstrap import BootstrapError, write_access_output
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "jellyfin-access"
+            write_access_output(path, "opaque-session-value")
+            self.assertEqual("opaque-session-value", path.read_text())
+            self.assertEqual(0o600, stat.S_IMODE(path.stat().st_mode))
+            with self.assertRaises(BootstrapError):
+                write_access_output(path, "replacement")
+            self.assertEqual("opaque-session-value", path.read_text())
+
     def test_last_json_object_ignores_buildkit_output(self):
         output = "#1 building\n#2 exporting\n{\"ok\":true,\"schema\":\"example.v1\"}\n"
         self.assertEqual({"ok": True, "schema": "example.v1"}, lab_script.last_json_object(output))

@@ -1,0 +1,10 @@
+{
+  "Version": "10.11.11",
+  "ProductName": "Jellyfin Server",
+  "HasPendingRestart": false,
+  "IsShuttingDown": false,
+  "SupportsLibraryMonitor": true,
+  "StartupWizardCompleted": true,
+  "ServerName": "PRIVATE-SERVER",
+  "Id": "private-server-id"
+}

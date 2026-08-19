@@ -22,7 +22,36 @@ SENSITIVE_KEYS = {
 }
 RETRYABLE_STATUS = {429, 502, 503, 504}
 HTTP_HEADER_NAME = re.compile(r"[!#$%&'*+.^_`|~0-9A-Za-z-]+")
-CREDENTIAL_HEADERS = {"Authorization": "Bearer ", "X-Api-Key": ""}
+CREDENTIAL_HEADERS = {"Authorization": "Bearer ", "X-Api-Key": "", "X-Emby-Token": ""}
+PROJECTED_ENDPOINT_FIELDS = {
+    "/System/Info/Public": ("Version", "StartupWizardCompleted"),
+}
+
+
+def _projection_required_alias(path: object) -> bool:
+    if not isinstance(path, str):
+        return False
+    parsed = urllib.parse.urlsplit(path)
+    decoded = parsed.path
+    while True:
+        expanded = urllib.parse.unquote(decoded)
+        if expanded == decoded:
+            break
+        decoded = expanded
+    segments: list[str] = []
+    for raw in decoded.replace("\\", "/").split("/"):
+        folded = raw.casefold()
+        if not folded or folded == ".":
+            continue
+        if folded == "..":
+            if segments:
+                segments.pop()
+            continue
+        segment = folded.rstrip(". ")
+        if not segment:
+            continue
+        segments.append(segment)
+    return len(segments) >= 2 and segments[:2] == ["system", "info"]
 
 
 class TransportFailure(RuntimeError):
@@ -321,10 +350,33 @@ class ReadOnlyHttpTransport:
     def get_json(self, path: str) -> dict[str, Any] | list[Any]:
         return self.request_json("GET", path)
 
+    def get_json_fields(self, path: str, fields: tuple[str, ...]) -> dict[str, Any]:
+        if (
+            not isinstance(fields, tuple)
+            or PROJECTED_ENDPOINT_FIELDS.get(path) != fields
+        ):
+            raise ValueError("response field projection is invalid")
+        parsed = self._request_json("GET", path, fields)
+        if not isinstance(parsed, dict):
+            raise TransportFailure("JSON_INVALID")
+        return parsed
+
     def request_json(self, method: str, path: str) -> dict[str, Any] | list[Any]:
+        return self._request_json(method, path, None)
+
+    def _request_json(
+        self,
+        method: str,
+        path: str,
+        projected_fields: tuple[str, ...] | None,
+    ) -> dict[str, Any] | list[Any]:
         method = method.upper()
         if method not in {"GET", "HEAD"}:
             raise TransportFailure("MUTATION_DISABLED")
+        if not isinstance(path, str) or len(path) > 4096:
+            raise TransportFailure("PATH_INVALID")
+        if method == "GET" and projected_fields is None and _projection_required_alias(path):
+            raise TransportFailure("FIELD_PROJECTION_REQUIRED")
         safe_path = _safe_path(path)
         credential = None
         try:
@@ -386,6 +438,10 @@ class ReadOnlyHttpTransport:
                         raise TransportFailure("JSON_INVALID", attempts=attempt)
                     if not isinstance(parsed, (dict, list)):
                         raise TransportFailure("JSON_INVALID", attempts=attempt)
+                    if projected_fields is not None:
+                        if not isinstance(parsed, dict):
+                            raise TransportFailure("JSON_INVALID", attempts=attempt)
+                        parsed = {field: parsed[field] for field in projected_fields if field in parsed}
                     if _contains_sensitive_key(parsed, (credential_text,)):
                         raise TransportFailure("PRIVATE_DATA_REDACTED", attempts=attempt)
                     if self.clock() >= deadline:

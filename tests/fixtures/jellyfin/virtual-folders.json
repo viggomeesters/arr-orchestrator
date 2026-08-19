@@ -1,0 +1,16 @@
+[
+  {
+    "Name": "PRIVATE MOVIES",
+    "Locations": ["/media/movies"],
+    "CollectionType": "movies",
+    "ItemId": "private-item-id",
+    "PrimaryImageItemId": "private-image-id",
+    "RefreshProgress": null
+  },
+  {
+    "Name": "PRIVATE SHOWS",
+    "Locations": ["/media/tv", "/media/archive/tv"],
+    "CollectionType": "tvshows",
+    "RefreshProgress": 42.5
+  }
+]

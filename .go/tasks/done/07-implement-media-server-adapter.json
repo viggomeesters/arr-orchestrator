@@ -1,0 +1,107 @@
+{
+  "schema": "go-workflow.repo-local.task.v1",
+  "kind": "task",
+  "execution_mode": "agent",
+  "shareable_delivery": "none",
+  "id": "07-implement-media-server-adapter",
+  "project": "arr-orchestrator",
+  "status": "done",
+  "summary": "Implement a read-only Jellyfin adapter",
+  "description": "Add health, library-path, and refresh-status discovery needed to verify user-visible media availability.",
+  "scope": {
+    "read": [
+      "schemas/**",
+      "src/**",
+      "docs/**"
+    ],
+    "modify": [
+      "src/arr_orchestrator/transport.py",
+      "src/arr_orchestrator/adapters/__init__.py",
+      "src/arr_orchestrator/adapters/jellyfin.py",
+      "scripts/lab.py",
+      "lab/controller/bootstrap.py",
+      "tests/lab/test_bootstrap.py",
+      "tests/transport/test_transport.py",
+      "tests/adapters/test_jellyfin.py",
+      "tests/fixtures/jellyfin/**",
+      "docs/adapters/jellyfin.md",
+      "tests/integration/test_jellyfin_lab.py"
+    ]
+  },
+  "acceptance": [
+    "Adapter reports health and library visibility without persisting media titles.",
+    "Unsupported capabilities remain explicit.",
+    "Synthetic fixtures prove healthy, unreachable, and partial states.",
+    "The adapter reuses transport-01 for endpoint policy, credentials, retries, typed failures, and redaction rather than implementing a private HTTP stack.",
+    "Fast synthetic fixture tests and a focused real-container jellyfin lane both pass.",
+    "Read-only operation performs no domain mutation; any required authentication session is explicitly classified and side-effect-free."
+  ],
+  "verification": [
+    "python3 -m unittest tests.adapters.test_jellyfin",
+    "python3 scripts/lab.py test adapter jellyfin",
+    "bash scripts/check.sh"
+  ],
+  "claim": {
+    "agent": "hermes",
+    "claimed_at": "2026-08-19T08:06:12+02:00"
+  },
+  "work_status": "completed",
+  "review_status": "review",
+  "review_history": [],
+  "evidence": [
+    {
+      "schema": "go-workflow.finish-evidence.v1",
+      "created_at": "2026-08-19T09:36:11+02:00",
+      "task_id": "07-implement-media-server-adapter",
+      "agent": "hermes",
+      "summary": "changed_files=src/arr_orchestrator/transport.py,src/arr_orchestrator/adapters/__init__.py,src/arr_orchestrator/adapters/jellyfin.py,scripts/lab.py,lab/controller/bootstrap.py,tests/lab/test_bootstrap.py,tests/transport/test_transport.py,tests/adapters/test_jellyfin.py,tests/fixtures/jellyfin/system-info.json,tests/fixtures/jellyfin/virtual-folders.json,tests/fixtures/jellyfin/scheduled-tasks.json,tests/integration/test_jellyfin_lab.py,docs/adapters/jellyfin.md; verification=167/167 full unittest passed, focused 36/36 passed, scripts/check.sh passed, public safety 199 paths passed, go validate passed, py_compile passed, live digest-pinned Jellyfin 10.11.11 passed with setup_post=4 auth_post=1 adapter_get=3 published_ports=0 cleanup_containers_networks_volumes_images=0; reviewer=independent read-only critic Verdict A zero blockers, 2639/2639 adversarial probes, exact initial/final hash 071bd54a23775b9c1bd45219a6a8e40c2469c416be06ed89aafb1fecd7141e62 over 16 paths, index unchanged, reviewer modifications none; attribution=Hermes implemented TDD-first adapter transport projection lab lane tests fixtures and documentation; ship=commit_and_push_after_finish",
+      "changed_files": [
+        "src/arr_orchestrator/transport.py",
+        "src/arr_orchestrator/adapters/__init__.py",
+        "src/arr_orchestrator/adapters/jellyfin.py",
+        "scripts/lab.py",
+        "lab/controller/bootstrap.py",
+        "tests/lab/test_bootstrap.py",
+        "tests/transport/test_transport.py",
+        "tests/adapters/test_jellyfin.py",
+        "tests/fixtures/jellyfin/system-info.json",
+        "tests/fixtures/jellyfin/virtual-folders.json",
+        "tests/fixtures/jellyfin/scheduled-tasks.json",
+        "tests/integration/test_jellyfin_lab.py",
+        "docs/adapters/jellyfin.md"
+      ],
+      "no_diff": false,
+      "verification": {
+        "command": "167/167 full unittest passed, focused 36/36 passed, scripts/check.sh passed, public safety 199 paths passed, go validate passed, py_compile passed, live digest-pinned Jellyfin 10.11.11 passed with setup_post=4 auth_post=1 adapter_get=3 published_ports=0 cleanup_containers_networks_volumes_images=0",
+        "result": "167/167 full unittest passed, focused 36/36 passed, scripts/check.sh passed, public safety 199 paths passed, go validate passed, py_compile passed, live digest-pinned Jellyfin 10.11.11 passed with setup_post=4 auth_post=1 adapter_get=3 published_ports=0 cleanup_containers_networks_volumes_images=0"
+      },
+      "runtime": {
+        "agent": "hermes",
+        "runtime": null,
+        "model": null,
+        "billing_mode": "unknown"
+      },
+      "usage": {
+        "schema": "go-workflow.usage-attribution.v1",
+        "runtime_kind": "unknown",
+        "billing_mode": "unknown",
+        "owner": "hermes",
+        "model": null,
+        "token_estimate": null,
+        "api_equivalent_cost_usd": null,
+        "provider_invoice_cost_usd": null,
+        "cost_label": "api_equivalent_not_invoice_cost"
+      },
+      "review": {
+        "outcome": "independent read-only critic Verdict A zero blockers, 2639/2639 adversarial probes, exact initial/final hash 071bd54a23775b9c1bd45219a6a8e40c2469c416be06ed89aafb1fecd7141e62 over 16 paths, index unchanged, reviewer modifications none",
+        "skip_reason": null
+      }
+    }
+  ],
+  "depends_on": [
+    "transport-01-build-shared-readonly-transport"
+  ],
+  "priority": 14,
+  "delivery": "product_implementation_backlog",
+  "order": 14
+}

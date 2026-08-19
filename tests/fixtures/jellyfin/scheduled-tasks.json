@@ -1,0 +1,17 @@
+[
+  {
+    "Name": "PRIVATE DISPLAY NAME",
+    "Key": "RefreshLibrary",
+    "State": "Running",
+    "CurrentProgressPercentage": 42.5,
+    "Id": "private-task-id",
+    "Description": "private description",
+    "LastExecutionResult": {"ErrorMessage": "/private/media/title"}
+  },
+  {
+    "Name": "Other Task",
+    "Key": "OtherTask",
+    "State": "Idle",
+    "CurrentProgressPercentage": null
+  }
+]

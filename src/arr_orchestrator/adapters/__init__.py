@@ -1,3 +1,12 @@
+from .jellyfin import (
+    JellyfinAdapter,
+    JellyfinAdapterFailure,
+    JellyfinCapabilities,
+    JellyfinHealth,
+    JellyfinLibrary,
+    JellyfinRefreshStatus,
+    JellyfinSnapshot,
+)
 from .qbittorrent import (
     QbittorrentAdapter,
     QbittorrentAdapterFailure,
@@ -39,6 +48,13 @@ from .sonarr import (
 )
 
 __all__ = [
+    "JellyfinAdapter",
+    "JellyfinAdapterFailure",
+    "JellyfinCapabilities",
+    "JellyfinHealth",
+    "JellyfinLibrary",
+    "JellyfinRefreshStatus",
+    "JellyfinSnapshot",
     "QbittorrentAdapter",
     "QbittorrentAdapterFailure",
     "QbittorrentCapabilities",

@@ -17,6 +17,7 @@ class FakeTransport:
         self.responses = {key: list(value) for key, value in (responses or {}).items()}
         self.failure = failure
         self.calls = []
+        self.projections = []
 
     def get_json(self, path, *, query=None):
         self.calls.append((path, query))
@@ -25,6 +26,11 @@ class FakeTransport:
         if path not in self.responses or not self.responses[path]:
             raise AssertionError(f"unexpected request: {path}")
         return self.responses[path].pop(0)
+
+    def get_json_list_fields(self, path, fields):
+        self.projections.append((path, fields))
+        values = self.get_json(path)
+        return [{field: item[field] for field in fields if field in item} for item in values]
 
 
 def fixture(name):
@@ -83,6 +89,16 @@ class ProwlarrAdapterTests(unittest.TestCase):
                 ("/api/v1/indexer", None),
             ],
             transport.calls,
+        )
+        self.assertEqual(
+            [
+                ("/api/v1/applications", ("id", "name", "implementation", "syncLevel")),
+                (
+                    "/api/v1/indexer",
+                    ("protocol", "privacy", "enable", "supportsRss", "supportsSearch"),
+                ),
+            ],
+            transport.projections,
         )
 
     def test_discovery_404_maps_only_to_unsupported_api(self):

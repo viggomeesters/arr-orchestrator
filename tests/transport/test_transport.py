@@ -435,6 +435,89 @@ class TransportTests(unittest.TestCase):
             raw.get_json("/" + "x" * 4096)
         self.assertEqual([], unopened.requests)
 
+    def test_prowlarr_lists_are_allowlist_projected_inside_transport(self):
+        endpoint = ServiceEndpoint("prowlarr", "http://prowlarr:9696", "file:prowlarr-api-key")
+        applications = json.dumps(
+            [{
+                "id": 1,
+                "name": "Synthetic Sonarr",
+                "implementation": "Sonarr",
+                "syncLevel": "addOnly",
+                "fields": [{"name": "apiKey", "value": "private-key-canary"}],
+                "prowlarrUrl": "http://private-prowlarr.invalid",
+            }]
+        ).encode()
+        indexers = json.dumps(
+            [{
+                "protocol": "usenet",
+                "privacy": "semiPrivate",
+                "enable": True,
+                "supportsRss": True,
+                "supportsSearch": True,
+                "fields": [{"name": "apiKey", "value": "private-indexer-canary"}],
+                "indexerUrls": ["http://private-indexer.invalid"],
+            }]
+        ).encode()
+        opener = Opener([Response(body=applications), Response(body=indexers)])
+        transport = ReadOnlyHttpTransport(
+            endpoint,
+            Resolver(),
+            opener=opener,
+            credential_header="X-Api-Key",
+            credential_prefix="",
+        )
+
+        self.assertEqual(
+            [{"id": 1, "name": "Synthetic Sonarr", "implementation": "Sonarr", "syncLevel": "addOnly"}],
+            transport.get_json_list_fields(
+                "/api/v1/applications", ("id", "name", "implementation", "syncLevel")
+            ),
+        )
+        self.assertEqual(
+            [{"protocol": "usenet", "privacy": "semiPrivate", "enable": True, "supportsRss": True, "supportsSearch": True}],
+            transport.get_json_list_fields(
+                "/api/v1/indexer",
+                ("protocol", "privacy", "enable", "supportsRss", "supportsSearch"),
+            ),
+        )
+
+        for path, fields in (
+            ("/api/v1/applications", ("id",)),
+            ("/api/v1/indexer", ("protocol",)),
+            ("/api/v1/Indexer", ("protocol", "privacy", "enable", "supportsRss", "supportsSearch")),
+        ):
+            unopened = Opener([])
+            guarded = ReadOnlyHttpTransport(
+                endpoint,
+                Resolver(),
+                opener=unopened,
+                credential_header="X-Api-Key",
+                credential_prefix="",
+            )
+            with self.subTest(path=path, fields=fields), self.assertRaises(ValueError):
+                guarded.get_json_list_fields(path, fields)
+            self.assertEqual([], unopened.requests)
+
+        for alias in (
+            "/api/v1/applications",
+            "/api/v1/%61pplications",
+            "/prefix/../api/v1/indexer",
+            "/API/V1/INDEXER.",
+        ):
+            unopened = Opener([])
+            guarded = ReadOnlyHttpTransport(
+                endpoint,
+                Resolver(),
+                opener=unopened,
+                credential_header="X-Api-Key",
+                credential_prefix="",
+            )
+            with self.subTest(alias=alias), self.assertRaisesRegex(
+                TransportFailure, "FIELD_PROJECTION_REQUIRED"
+            ):
+                guarded.get_json(alias)
+            self.assertEqual([], unopened.requests)
+
     def test_transport_policy_rejects_non_integral_and_non_finite_bounds(self):
         invalid = (
             {"max_response_bytes": float("inf")},

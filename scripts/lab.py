@@ -2166,6 +2166,221 @@ def test_scenarios() -> int:
     return emit(result)
 
 
+def test_inventory() -> int:
+    lab_id, project, root = create_runtime()
+    env = lab_env(lab_id, project, root)
+    completed = False
+    controller_runs: list[subprocess.CompletedProcess[str]] = []
+    result: dict[str, object]
+    try:
+        _layout, bundle, mock_path, mock_value = prepare_bootstrap_runtime(root)
+        session_root = root / "session"
+        session_root.mkdir(mode=0o755)
+        assign_owner(session_root, 65532, 65532, directory_mode=0o755)
+        access_path = session_root / "jellyfin-access"
+        run(
+            compose_command(
+                "--profile", "services", "--profile", "doubles", "up", "-d", "--build", "--wait",
+                "sonarr", "radarr", "prowlarr", "qbittorrent", "jellyfin", "mock-indexer",
+            ),
+            env=env,
+        )
+        service_rows = run(
+            [
+                "docker", "ps", "--filter", f"label=com.docker.compose.project={project}",
+                "--format", "{{.Label \"com.docker.compose.service\"}}={{.ID}}",
+            ]
+        ).stdout.splitlines()
+        services = dict(row.split("=", 1) for row in service_rows if "=" in row)
+        inspection = verify_real_service_inspection(project, services)
+
+        bootstrap_mounts: list[str] = []
+        for service, path in sorted(bundle.files.items()):
+            bootstrap_mounts.extend(("--volume", f"{path}:/run/secrets/{service}-credential:ro"))
+        bootstrap_mounts.extend(
+            (
+                "--volume", f"{mock_path}:/run/secrets/mock-indexer-" "tok" "en:ro",
+                "--volume", f"{session_root}:/run/output:rw",
+            )
+        )
+        bootstrap_probe = r'''
+import json
+from pathlib import Path
+from lab.controller.bootstrap import bootstrap_arr,bootstrap_jellyfin,bootstrap_qbittorrent,redacted_result
+states,baselines=bootstrap_arr()
+states['qbittorrent'],baselines['qbittorrent']=bootstrap_qbittorrent()
+states['jellyfin'],baselines['jellyfin']=bootstrap_jellyfin(Path('/run/output/jellyfin-access'))
+print(json.dumps(redacted_result(states,baselines),sort_keys=True,separators=(',',':')))
+'''
+        bootstrap_run = run(
+            compose_command(
+                "--profile", "isolation", "run", "--rm", "--build", "--no-deps",
+                *bootstrap_mounts, "--entrypoint", "python3", "lab-controller", "-c", bootstrap_probe,
+            ),
+            env=env,
+            check=False,
+        )
+        controller_runs.append(bootstrap_run)
+        if bootstrap_run.returncode != 0 or last_json_object(bootstrap_run.stdout).get("ok") is not True:
+            raise LabError("inventory baseline bootstrap failed")
+        if not access_path.is_file() or stat.S_IMODE(access_path.stat().st_mode) != 0o600:
+            raise LabError("inventory Jellyfin access file boundary is invalid")
+
+        raw_secrets = {
+            "sonarr-api-key": write_secret(root, "inventory-sonarr-api-key", value=bundle.value("sonarr", "api_key")),
+            "radarr-api-key": write_secret(root, "inventory-radarr-api-key", value=bundle.value("radarr", "api_key")),
+            "prowlarr-api-key": write_secret(root, "inventory-prowlarr-api-key", value=bundle.value("prowlarr", "api_key")),
+            "qbittorrent-bearer": write_secret(root, "inventory-qbittorrent-bearer", value=bundle.value("qbittorrent", "api_key")),
+            "jellyfin-access": access_path,
+        }
+        inventory_mounts: list[str] = []
+        for name, path in sorted(raw_secrets.items()):
+            inventory_mounts.extend(("--volume", f"{path}:/run/secrets/{name}:ro"))
+        inventory_probe = r'''
+import json
+from pathlib import Path
+from arr_orchestrator.adapters.jellyfin import JellyfinAdapter
+from arr_orchestrator.adapters.prowlarr import ProwlarrAdapter
+from arr_orchestrator.adapters.qbittorrent import QbittorrentAdapter
+from arr_orchestrator.adapters.radarr import RadarrAdapter
+from arr_orchestrator.adapters.sonarr import SonarrAdapter
+from arr_orchestrator.config import ServiceEndpoint
+from arr_orchestrator.credentials import FileCredentialResolver
+from arr_orchestrator.inventory import StackInventoryBuilder
+from arr_orchestrator.transport import QbittorrentReadOnlyTransport,ReadOnlyHttpTransport,TransportPolicy,_default_opener
+
+class CountingOpener:
+    def __init__(self,delegate): self.delegate=delegate; self.methods=[]
+    def open(self,request,timeout=None):
+        self.methods.append(request.get_method())
+        return self.delegate.open(request,timeout=timeout)
+
+resolver=FileCredentialResolver(Path('/run/secrets'),expected_uid=65532)
+policy=TransportPolicy(deadline_seconds=2,max_attempts=2)
+openers={}
+def http(service,url,secret,header):
+    endpoint=ServiceEndpoint(service,url,'file:'+secret)
+    base=ReadOnlyHttpTransport(endpoint,resolver,policy=policy,credential_header=header,credential_prefix='')
+    opener=CountingOpener(base.opener); openers[service]=opener
+    return ReadOnlyHttpTransport(endpoint,resolver,policy=policy,opener=opener,credential_header=header,credential_prefix='')
+
+qbit_endpoint=ServiceEndpoint('qbittorrent','http://qbittorrent:8080','file:qbittorrent-bearer')
+qbit_opener=CountingOpener(_default_opener(True)); openers['qbittorrent']=qbit_opener
+jelly_transport=http('jellyfin','http://jellyfin:8096','jellyfin-access','X-Emby-Token')
+readers={
+    'sonarr':SonarrAdapter(http('sonarr','http://sonarr:8989','sonarr-api-key','X-Api-Key')),
+    'radarr':RadarrAdapter(http('radarr','http://radarr:7878','radarr-api-key','X-Api-Key')),
+    'prowlarr':ProwlarrAdapter(http('prowlarr','http://prowlarr:9696','prowlarr-api-key','X-Api-Key')),
+    'qbittorrent':QbittorrentAdapter(QbittorrentReadOnlyTransport(qbit_endpoint,resolver.resolve('file:qbittorrent-bearer'),policy=policy,opener=qbit_opener)),
+    'jellyfin':JellyfinAdapter(jelly_transport),
+}
+inventory=StackInventoryBuilder(readers).read()
+payload={'schema':'arr-orchestrator.lab-inventory-probe.v1','inventory':inventory.to_dict(),'request_methods':{key:value.methods for key,value in sorted(openers.items())}}
+encoded=json.dumps(payload,sort_keys=True,separators=(',',':'))
+for secret in ('sonarr-api-key','radarr-api-key','prowlarr-api-key','qbittorrent-bearer','jellyfin-access'):
+    if resolver.resolve('file:'+secret).reveal() in encoded:
+        print(json.dumps({'schema':'arr-orchestrator.lab-inventory-probe-error.v1','error':'PRIVATE_DATA_REDACTED'},sort_keys=True))
+        raise SystemExit(1)
+print(encoded)
+'''
+
+        def read_inventory() -> tuple[subprocess.CompletedProcess[str], dict[str, object]]:
+            controller = run(
+                compose_command(
+                    "--profile", "isolation", "run", "--rm", "--build", "--no-deps",
+                    *inventory_mounts, "--entrypoint", "python3", "lab-controller", "-c", inventory_probe,
+                ),
+                env=env,
+                check=False,
+            )
+            controller_runs.append(controller)
+            if controller.returncode != 0:
+                raise LabError("inventory controller probe failed")
+            payload = last_json_object(controller.stdout)
+            methods = payload.get("request_methods")
+            if not isinstance(methods, dict) or any(
+                not isinstance(values, list) or any(method != "GET" for method in values)
+                for values in methods.values()
+            ):
+                raise LabError("inventory probe performed a non-read-only request")
+            return controller, payload
+
+        healthy_run, healthy_payload = read_inventory()
+        healthy = healthy_payload.get("inventory")
+        if not isinstance(healthy, dict) or healthy.get("state") != "healthy":
+            diagnostic = [
+                {
+                    "service": item.get("service"),
+                    "state": item.get("state"),
+                    "failure_code": item.get("failure_code"),
+                }
+                for item in healthy.get("services", [])
+                if isinstance(healthy, dict) and isinstance(item, dict)
+            ]
+            raise LabError(
+                "healthy inventory did not report a healthy stack: "
+                + json.dumps(diagnostic, sort_keys=True, separators=(",", ":"))
+            )
+        healthy_services = healthy.get("services")
+        expected_services = {"sonarr", "radarr", "prowlarr", "qbittorrent", "jellyfin"}
+        if not isinstance(healthy_services, list) or {
+            item.get("service") for item in healthy_services if isinstance(item, dict)
+        } != expected_services:
+            raise LabError("healthy inventory did not include all five adapters")
+
+        run_authorized_compose_mutation(
+            project,
+            lab_id,
+            root,
+            {"prowlarr"},
+            compose_command("--profile", "services", "stop", "prowlarr"),
+            env,
+        )
+        stopped = scenario_service_container(project, "prowlarr")
+        if json.loads(run(["docker", "inspect", stopped]).stdout)[0]["State"]["Running"]:
+            raise LabError("inventory partial probe did not stop Prowlarr")
+        partial_run, partial_payload = read_inventory()
+        partial = partial_payload.get("inventory")
+        if not isinstance(partial, dict) or partial.get("state") != "partial":
+            raise LabError("partial inventory became an all-green stack claim")
+        partial_services = {
+            item.get("service"): item
+            for item in partial.get("services", [])
+            if isinstance(item, dict)
+        }
+        if partial_services.get("prowlarr", {}).get("state") != "unreachable" or any(
+            partial_services.get(service, {}).get("state") != "available"
+            for service in expected_services - {"prowlarr"}
+        ):
+            raise LabError("partial inventory did not preserve service-level availability")
+
+        secret_variants = credential_variants(bundle, mock_value)
+        assert_no_secret_exposure(project, controller_runs, secret_variants, env)
+        result = {
+            "schema": "arr-orchestrator.lab-inventory-run.v1",
+            "lab_id": lab_id,
+            "ok": True,
+            "healthy_state": healthy["state"],
+            "partial_state": partial["state"],
+            "partial_service": "prowlarr",
+            "services": sorted(expected_services),
+            "published_ports": 0,
+            "runtime_matrix_verified": inspection["runtime_matrix_verified"],
+        }
+        completed = True
+    finally:
+        down = run(compose_down_command("services", "doubles", "isolation"), env=env, check=False)
+        remaining_containers = run(["docker", "ps", "-aq", "--filter", f"label=com.docker.compose.project={project}"]).stdout.split()
+        remaining_networks = run(["docker", "network", "ls", "-q", "--filter", f"label=com.docker.compose.project={project}"]).stdout.split()
+        remaining_volumes = run(["docker", "volume", "ls", "-q", "--filter", f"label=com.docker.compose.project={project}"]).stdout.split()
+        remaining_images = remaining_project_images(project)
+        if down.returncode != 0 or remaining_containers or remaining_networks or remaining_volumes or remaining_images:
+            finalize_runtime(root, lab_id, project, success=False)
+            raise LabError("bounded inventory cleanup did not converge")
+        finalize_runtime(root, lab_id, project, success=completed)
+    return emit(result)
+
+
 def render() -> int:
     lab_id = "lab-render"
     project = f"arr-orchestrator-{lab_id}"
@@ -2252,7 +2467,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("render")
     test_parser = subparsers.add_parser("test")
     test_parser.add_argument(
-        "suite", choices=("isolation", "doubles", "bootstrap", "scenarios", "transport", "adapter")
+        "suite", choices=("isolation", "doubles", "bootstrap", "scenarios", "transport", "adapter", "inventory")
     )
     test_parser.add_argument(
         "service", nargs="?", choices=("sonarr", "radarr", "prowlarr", "qbittorrent", "jellyfin")
@@ -2276,6 +2491,8 @@ def main(argv: list[str] | None = None) -> int:
                 return test_scenarios()
             if args.suite == "transport":
                 return test_transport()
+            if args.suite == "inventory":
+                return test_inventory()
             if args.suite == "adapter":
                 if args.service == "sonarr":
                     return test_sonarr_adapter()

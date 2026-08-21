@@ -21,6 +21,8 @@ class JsonTransport(Protocol):
         query: Mapping[str, str | int | bool] | None = None,
     ) -> object: ...
 
+    def get_json_list_fields(self, path: str, fields: tuple[str, ...]) -> list[dict[str, object]]: ...
+
 
 class ProwlarrAdapterFailure(RuntimeError):
     def __init__(self, code: str, *, retryable: bool = False) -> None:
@@ -176,6 +178,15 @@ class ProwlarrAdapter:
         assert failure is not None
         return _raise_adapter_failure(*failure)
 
+    def _get_json_list_fields(self, path: str, fields: tuple[str, ...]) -> object:
+        failure: tuple[str, bool] | None = None
+        try:
+            return self.transport.get_json_list_fields(path, fields)
+        except TransportFailure as error:
+            failure = (error.code, error.retryable)
+        assert failure is not None
+        return _raise_adapter_failure(*failure)
+
     def _discover_json(self) -> object:
         failure: tuple[str, bool] | None = None
         try:
@@ -209,7 +220,11 @@ class ProwlarrAdapter:
 
     def _applications(self) -> tuple[ProwlarrApplication, ...]:
         applications: list[ProwlarrApplication] = []
-        for raw in _list(self._get_json("/api/v1/applications")):
+        for raw in _list(
+            self._get_json_list_fields(
+                "/api/v1/applications", ("id", "name", "implementation", "syncLevel")
+            )
+        ):
             item = _mapping(raw)
             sync_level = _string(item, "syncLevel")
             if sync_level not in SYNC_LEVELS:
@@ -225,7 +240,12 @@ class ProwlarrAdapter:
         return tuple(applications)
 
     def _indexers(self) -> ProwlarrIndexerSummary:
-        values = _list(self._get_json("/api/v1/indexer"))
+        values = _list(
+            self._get_json_list_fields(
+                "/api/v1/indexer",
+                ("protocol", "privacy", "enable", "supportsRss", "supportsSearch"),
+            )
+        )
         enabled = 0
         rss_capable = 0
         search_capable = 0

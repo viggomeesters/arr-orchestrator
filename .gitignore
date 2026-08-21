@@ -28,6 +28,10 @@ runtime/
 !schemas/runtime/service-endpoints.schema.json
 state/
 inventory/
+!src/arr_orchestrator/inventory/
+!src/arr_orchestrator/inventory/**
+!tests/inventory/
+!tests/inventory/**
 plans/generated/
 reports/generated/
 *.sqlite

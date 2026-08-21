@@ -1,0 +1,81 @@
+{
+  "schema": "go-workflow.repo-local.task.v1",
+  "kind": "task",
+  "execution_mode": "agent",
+  "shareable_delivery": "none",
+  "id": "08a-harden-inventory-exception-metadata",
+  "project": "arr-orchestrator",
+  "status": "done",
+  "summary": "Harden inventory failure metadata extraction",
+  "description": "Post-ship security correction from independent task-08 review: hostile exception code or retryable properties must not abort stack inventory or expose provider-controlled exception messages.",
+  "scope": {
+    "read": [
+      "src/arr_orchestrator/inventory/core.py",
+      "tests/inventory/test_inventory.py"
+    ],
+    "modify": [
+      "src/arr_orchestrator/inventory/core.py",
+      "tests/inventory/test_inventory.py"
+    ]
+  },
+  "acceptance": [
+    "Hostile exception code properties are normalized to a redacted per-service failure without escaping.",
+    "Hostile exception retryable properties are normalized to a redacted per-service failure without escaping.",
+    "Inventory output never contains the hostile property exception message.",
+    "Process-control exceptions raised by the reader itself continue to propagate."
+  ],
+  "verification": [
+    "python3 -m unittest tests.inventory.test_inventory",
+    "bash scripts/check.sh",
+    "./go validate ."
+  ],
+  "claim": {
+    "agent": "hermes",
+    "claimed_at": "2026-08-21T09:07:56+02:00"
+  },
+  "work_status": "completed",
+  "review_status": "review",
+  "review_history": [],
+  "evidence": [
+    {
+      "schema": "go-workflow.finish-evidence.v1",
+      "created_at": "2026-08-21T09:25:01+02:00",
+      "task_id": "08a-harden-inventory-exception-metadata",
+      "agent": "hermes",
+      "summary": "changed_files=.go/hierarchy.json,.go/runs/events.jsonl,.go/tasks/active/08a-harden-inventory-exception-metadata.json,src/arr_orchestrator/inventory/core.py,tests/inventory/test_inventory.py; verification_command=RED hostile code/retryable properties plus hostile str hash plus hostile dict-key equality then 13/13 inventory plus 183/183 full unittest plus trusted adapter types 5/5 plus scripts/check.sh plus ./go validate . plus git diff --check plus compile; verification_result=passed: exact five trusted adapter failure classes, unknown and subclass failures redacted before attribute/string access, exact scalar types required, safe failures preserved, process-control propagated, public safety 204 paths; critic=independent read-only Verdict A zero blockers and zero nonblockers on exact hash 9765df09e4ce3d6800b2a9761eb006a67cdbae259e0e49064b5945d36812d247 over 5 paths, adversarial subclasses 5/5 hostile scalar payloads 5/5 unknown metadata routes 5/5 mismatched types 5/5 trusted safe failures 5/5, initial/final index and tree unchanged, reviewer modifications none; runtime=hermes-agent; model=gpt-5.6-sol; billing_mode=subscription; owner=viggo; ship=commit_and_push_after_finish",
+      "changed_files": [
+        ".go/hierarchy.json",
+        ".go/runs/events.jsonl",
+        ".go/tasks/active/08a-harden-inventory-exception-metadata.json",
+        "src/arr_orchestrator/inventory/core.py",
+        "tests/inventory/test_inventory.py"
+      ],
+      "no_diff": false,
+      "verification": {
+        "command": "RED hostile code/retryable properties plus hostile str hash plus hostile dict-key equality then 13/13 inventory plus 183/183 full unittest plus trusted adapter types 5/5 plus scripts/check.sh plus ./go validate . plus git diff --check plus compile",
+        "result": "passed: exact five trusted adapter failure classes, unknown and subclass failures redacted before attribute/string access, exact scalar types required, safe failures preserved, process-control propagated, public safety 204 paths"
+      },
+      "runtime": {
+        "agent": "hermes",
+        "runtime": "hermes-agent",
+        "model": "gpt-5.6-sol",
+        "billing_mode": "subscription"
+      },
+      "usage": {
+        "schema": "go-workflow.usage-attribution.v1",
+        "runtime_kind": "hermes-agent",
+        "billing_mode": "subscription",
+        "owner": "viggo",
+        "model": "gpt-5.6-sol",
+        "token_estimate": null,
+        "api_equivalent_cost_usd": null,
+        "provider_invoice_cost_usd": null,
+        "cost_label": "api_equivalent_not_invoice_cost"
+      },
+      "review": {
+        "outcome": "independent read-only Verdict A zero blockers and zero nonblockers on exact hash 9765df09e4ce3d6800b2a9761eb006a67cdbae259e0e49064b5945d36812d247 over 5 paths, adversarial subclasses 5/5 hostile scalar payloads 5/5 unknown metadata routes 5/5 mismatched types 5/5 trusted safe failures 5/5, initial/final index and tree unchanged, reviewer modifications none",
+        "skip_reason": null
+      }
+    }
+  ]
+}

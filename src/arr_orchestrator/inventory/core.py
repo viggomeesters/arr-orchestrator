@@ -5,6 +5,12 @@ import re
 from dataclasses import dataclass
 from typing import Mapping, Protocol
 
+from ..adapters.jellyfin import JellyfinAdapterFailure
+from ..adapters.prowlarr import ProwlarrAdapterFailure
+from ..adapters.qbittorrent import QbittorrentAdapterFailure
+from ..adapters.radarr import RadarrAdapterFailure
+from ..adapters.sonarr import SonarrAdapterFailure
+
 REQUIRED_SERVICES = ("sonarr", "radarr", "prowlarr", "qbittorrent", "jellyfin")
 _STATES = ("available", "partial", "unreachable", "unsupported", "unknown")
 _UNREACHABLE = {"SERVICE_UNREACHABLE", "DEADLINE_EXCEEDED", "TLS_VERIFICATION_FAILED"}
@@ -40,6 +46,13 @@ _RESOURCES = {
 }
 _COLLECTION_TYPES = {"books", "boxsets", "homevideos", "mixed", "movies", "music", "musicvideos", "tvshows"}
 _VERSION = re.compile(r"^v?[0-9][0-9A-Za-z]*(?:[._+-][0-9A-Za-z]+)*$")
+_FAILURE_TYPES = {
+    "sonarr": SonarrAdapterFailure,
+    "radarr": RadarrAdapterFailure,
+    "prowlarr": ProwlarrAdapterFailure,
+    "qbittorrent": QbittorrentAdapterFailure,
+    "jellyfin": JellyfinAdapterFailure,
+}
 
 
 class SnapshotReader(Protocol):
@@ -219,20 +232,27 @@ def _project(service: str, snapshot: object) -> ServiceInventory:
 
 
 def _failure(service: str, error: BaseException) -> ServiceInventory:
-    raw_code = getattr(error, "code", None)
-    code = raw_code if isinstance(raw_code, str) and raw_code in _SAFE_FAILURES else "INVENTORY_READ_FAILED"
+    if type(error) is not _FAILURE_TYPES[service]:
+        return ServiceInventory(service, "unknown", failure_code="INVENTORY_READ_FAILED")
+    if type(error) is JellyfinAdapterFailure:
+        arguments = error.args
+        raw_code = arguments[0] if type(arguments) is tuple and len(arguments) == 1 else None
+        retryable = False
+    else:
+        raw_code = error.code
+        retryable = error.retryable
+    code = raw_code if type(raw_code) is str and raw_code in _SAFE_FAILURES else "INVENTORY_READ_FAILED"
     if code in _UNREACHABLE:
         state = "unreachable"
     elif code in _UNSUPPORTED:
         state = "unsupported"
     else:
         state = "unknown"
-    retryable = getattr(error, "retryable", False)
     return ServiceInventory(
         service=service,
         state=state,
         failure_code=code,
-        retryable=retryable if isinstance(retryable, bool) else False,
+        retryable=retryable if type(retryable) is bool else False,
     )
 
 

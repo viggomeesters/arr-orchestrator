@@ -10,6 +10,11 @@ from types import SimpleNamespace as NS
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 
+from arr_orchestrator.adapters.jellyfin import JellyfinAdapterFailure
+from arr_orchestrator.adapters.prowlarr import ProwlarrAdapterFailure
+from arr_orchestrator.adapters.qbittorrent import QbittorrentAdapterFailure
+from arr_orchestrator.adapters.radarr import RadarrAdapterFailure
+from arr_orchestrator.adapters.sonarr import SonarrAdapterFailure
 from arr_orchestrator.inventory import REQUIRED_SERVICES, StackInventoryBuilder
 
 
@@ -40,6 +45,45 @@ class ProjectionBomb:
     @property
     def capabilities(self):
         raise Failure("AUTH_FAILED", retryable=True)
+
+
+class HostileFailureMetadata(RuntimeError):
+    @property
+    def code(self):
+        raise RuntimeError("hostile-code-property")
+
+
+class HostileRetryableMetadata(RuntimeError):
+    def __init__(self):
+        self.code = "SERVICE_UNREACHABLE"
+        super().__init__("hostile-retryable-property")
+
+    @property
+    def retryable(self):
+        raise RuntimeError("hostile-retryable-property")
+
+
+class HostileFailureCode(str):
+    def __hash__(self):
+        raise RuntimeError("hostile-string-hash")
+
+
+HOSTILE_DICTIONARY_CALLS: list[str] = []
+
+
+class HostileMetadataKey(str):
+    def __hash__(self):
+        return hash("code")
+
+    def __eq__(self, other):
+        raise RuntimeError("hostile-dict-key-equality")
+
+
+class HostileDictionaryFailure(RuntimeError):
+    @property
+    def __dict__(self):
+        HOSTILE_DICTIONARY_CALLS.append("executed")
+        return {HostileMetadataKey("code"): "AUTH_FAILED"}
 
 
 class PrivateSnapshot(NS):
@@ -119,10 +163,10 @@ class StackInventoryTests(unittest.TestCase):
 
     def test_failure_classes_preserve_uncertainty_without_leaking_exception_text(self):
         readers = successful_readers()
-        readers["radarr"] = Reader(failure=Failure("SERVICE_UNREACHABLE", retryable=True))
-        readers["prowlarr"] = Reader(failure=Failure("UNSUPPORTED_API_VERSION"))
-        readers["qbittorrent"] = Reader(failure=Failure("AUTH_FAILED"))
-        readers["jellyfin"] = Reader(failure=ValueError(PRIVATE))
+        readers["radarr"] = Reader(failure=RadarrAdapterFailure("SERVICE_UNREACHABLE", retryable=True))
+        readers["prowlarr"] = Reader(failure=ProwlarrAdapterFailure("UNSUPPORTED_API_VERSION"))
+        readers["qbittorrent"] = Reader(failure=QbittorrentAdapterFailure("AUTH_FAILED"))
+        readers["jellyfin"] = Reader(failure=JellyfinAdapterFailure(PRIVATE))
 
         payload = StackInventoryBuilder(readers).read().to_dict()
         services = {item["service"]: item for item in payload["services"]}
@@ -139,7 +183,7 @@ class StackInventoryTests(unittest.TestCase):
 
     def test_known_transport_failure_code_is_preserved_but_arbitrary_code_is_redacted(self):
         readers = successful_readers()
-        readers["prowlarr"] = Reader(failure=Failure("CONTENT_TYPE_INVALID"))
+        readers["prowlarr"] = Reader(failure=ProwlarrAdapterFailure("CONTENT_TYPE_INVALID"))
         readers["radarr"] = Reader(failure=Failure("PRIVATE_FAILURE_CODE"))
 
         services = {
@@ -149,6 +193,56 @@ class StackInventoryTests(unittest.TestCase):
 
         self.assertEqual("CONTENT_TYPE_INVALID", services["prowlarr"]["failure_code"])
         self.assertEqual("INVENTORY_READ_FAILED", services["radarr"]["failure_code"])
+
+    def test_hostile_exception_code_property_is_redacted_without_escaping(self):
+        readers = successful_readers()
+        readers["radarr"] = Reader(failure=HostileFailureMetadata("hostile-code-property"))
+
+        payload = StackInventoryBuilder(readers).read().to_dict()
+        service = {item["service"]: item for item in payload["services"]}["radarr"]
+
+        self.assertEqual("unknown", service["state"])
+        self.assertEqual("INVENTORY_READ_FAILED", service["failure_code"])
+        self.assertFalse(service["retryable"])
+        self.assertNotIn("hostile-code-property", json.dumps(payload, sort_keys=True))
+
+    def test_hostile_exception_retryable_property_is_redacted_without_escaping(self):
+        readers = successful_readers()
+        readers["radarr"] = Reader(failure=HostileRetryableMetadata())
+
+        payload = StackInventoryBuilder(readers).read().to_dict()
+        service = {item["service"]: item for item in payload["services"]}["radarr"]
+
+        self.assertEqual("unknown", service["state"])
+        self.assertEqual("INVENTORY_READ_FAILED", service["failure_code"])
+        self.assertFalse(service["retryable"])
+        self.assertNotIn("hostile-retryable-property", json.dumps(payload, sort_keys=True))
+
+    def test_hostile_string_subclass_failure_code_is_redacted_without_hashing(self):
+        readers = successful_readers()
+        readers["radarr"] = Reader(failure=RadarrAdapterFailure(HostileFailureCode("AUTH_FAILED")))
+
+        payload = StackInventoryBuilder(readers).read().to_dict()
+        service = {item["service"]: item for item in payload["services"]}["radarr"]
+
+        self.assertEqual("unknown", service["state"])
+        self.assertEqual("INVENTORY_READ_FAILED", service["failure_code"])
+        self.assertFalse(service["retryable"])
+        self.assertNotIn("hostile-string-hash", json.dumps(payload, sort_keys=True))
+
+    def test_hostile_exception_dictionary_property_is_not_executed(self):
+        readers = successful_readers()
+        HOSTILE_DICTIONARY_CALLS.clear()
+        readers["radarr"] = Reader(failure=HostileDictionaryFailure("hostile-dict-property"))
+
+        payload = StackInventoryBuilder(readers).read().to_dict()
+        service = {item["service"]: item for item in payload["services"]}["radarr"]
+
+        self.assertEqual("unknown", service["state"])
+        self.assertEqual("INVENTORY_READ_FAILED", service["failure_code"])
+        self.assertFalse(service["retryable"])
+        self.assertEqual([], HOSTILE_DICTIONARY_CALLS)
+        self.assertNotIn("hostile-dict-property", json.dumps(payload, sort_keys=True))
 
     def test_projection_failures_cannot_impersonate_adapter_failures(self):
         readers = successful_readers()

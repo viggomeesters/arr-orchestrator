@@ -28,7 +28,8 @@
           "tasks": [
             "01-define-core-contracts",
             "08-implement-stack-inventory",
-            "09-implement-doctor-rules"
+            "09-implement-doctor-rules",
+            "08a-harden-inventory-exception-metadata"
           ]
         },
         {

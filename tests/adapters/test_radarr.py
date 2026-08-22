@@ -21,6 +21,7 @@ class FakeTransport:
     def __init__(self, responses):
         self.responses = {path: list(values) for path, values in responses.items()}
         self.requests = []
+        self.projections = []
 
     def get_json(self, path):
         self.requests.append(path)
@@ -28,6 +29,11 @@ class FakeTransport:
         if isinstance(value, BaseException):
             raise value
         return value
+
+    def get_json_list_fields(self, path, fields):
+        self.projections.append((path, fields))
+        values = self.get_json(path)
+        return [{field: item[field] for field in fields if field in item} for item in values]
 
 
 class RadarrAdapterTests(unittest.TestCase):
@@ -87,6 +93,24 @@ class RadarrAdapterTests(unittest.TestCase):
             self.assertNotIn(forbidden, rendered)
         self.assertEqual(6, len(transport.requests))
         self.assertTrue(all(path.startswith("/api/v3/") for path in transport.requests))
+        self.assertEqual(
+            [
+                (
+                    "/api/v3/downloadclient",
+                    (
+                        "id",
+                        "name",
+                        "implementation",
+                        "protocol",
+                        "enable",
+                        "priority",
+                        "removeCompletedDownloads",
+                        "removeFailedDownloads",
+                    ),
+                )
+            ],
+            transport.projections,
+        )
 
     def test_unsupported_api_wrong_identity_and_later_404_keep_truthful_typed_failures(self):
         with self.assertRaises(RadarrAdapterFailure) as unsupported:
@@ -119,6 +143,16 @@ class RadarrAdapterTests(unittest.TestCase):
         self.assertNotIn(marker, repr(unavailable.exception) + str(unavailable.exception))
         self.assertIsNone(unavailable.exception.__cause__)
         self.assertIsNone(unavailable.exception.__context__)
+
+        download_failure = TransportFailure("PRIVATE_DATA_REDACTED")
+        download_failure.private = marker
+        with self.assertRaises(RadarrAdapterFailure) as download_unavailable:
+            RadarrAdapter(
+                FakeTransport({"/api/v3/downloadclient": [download_failure]})
+            )._download_clients()
+        self.assertEqual("PRIVATE_DATA_REDACTED", download_unavailable.exception.code)
+        self.assertIsNone(download_unavailable.exception.__cause__)
+        self.assertIsNone(download_unavailable.exception.__context__)
 
         malformed = fixture("system-status.json")
         malformed["version"] = {"unexpected": marker}

@@ -518,6 +518,94 @@ class TransportTests(unittest.TestCase):
                 guarded.get_json(alias)
             self.assertEqual([], unopened.requests)
 
+    def test_arr_download_clients_are_allowlist_projected_inside_transport(self):
+        fields = (
+            "id",
+            "name",
+            "implementation",
+            "protocol",
+            "enable",
+            "priority",
+            "removeCompletedDownloads",
+            "removeFailedDownloads",
+        )
+        body = json.dumps(
+            [
+                {
+                    "id": 2,
+                    "name": "Synthetic qBittorrent",
+                    "implementation": "QBittorrent",
+                    "protocol": "torrent",
+                    "enable": True,
+                    "priority": 1,
+                    "removeCompletedDownloads": True,
+                    "removeFailedDownloads": True,
+                    "fields": [
+                        {"name": "password", "value": "private-download-client-canary"}
+                    ],
+                }
+            ]
+        ).encode()
+        endpoint = ServiceEndpoint("sonarr", "http://sonarr:8989", "file:sonarr-api-key")
+        transport = ReadOnlyHttpTransport(
+            endpoint,
+            Resolver(),
+            opener=Opener([Response(body=body)]),
+            credential_header="X-Api-Key",
+            credential_prefix="",
+        )
+        self.assertEqual(
+            [
+                {
+                    "id": 2,
+                    "name": "Synthetic qBittorrent",
+                    "implementation": "QBittorrent",
+                    "protocol": "torrent",
+                    "enable": True,
+                    "priority": 1,
+                    "removeCompletedDownloads": True,
+                    "removeFailedDownloads": True,
+                }
+            ],
+            transport.get_json_list_fields("/api/v3/downloadclient", fields),
+        )
+
+        for path, requested_fields in (
+            ("/api/v3/downloadclient", ("id",)),
+            ("/api/v3/DownloadClient", fields),
+        ):
+            unopened = Opener([])
+            guarded = ReadOnlyHttpTransport(
+                endpoint,
+                Resolver(),
+                opener=unopened,
+                credential_header="X-Api-Key",
+                credential_prefix="",
+            )
+            with self.subTest(path=path, fields=requested_fields), self.assertRaises(ValueError):
+                guarded.get_json_list_fields(path, requested_fields)
+            self.assertEqual([], unopened.requests)
+
+        for alias in (
+            "/api/v3/downloadclient",
+            "/api/v3/%64ownloadclient",
+            "/prefix/../api/v3/downloadclient",
+            "/API/V3/DOWNLOADCLIENT.",
+        ):
+            unopened = Opener([])
+            guarded = ReadOnlyHttpTransport(
+                endpoint,
+                Resolver(),
+                opener=unopened,
+                credential_header="X-Api-Key",
+                credential_prefix="",
+            )
+            with self.subTest(alias=alias), self.assertRaisesRegex(
+                TransportFailure, "FIELD_PROJECTION_REQUIRED"
+            ):
+                guarded.get_json(alias)
+            self.assertEqual([], unopened.requests)
+
     def test_transport_policy_rejects_non_integral_and_non_finite_bounds(self):
         invalid = (
             {"max_response_bytes": float("inf")},

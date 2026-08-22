@@ -6,6 +6,7 @@ import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from unittest import mock
 
 from scripts import lab as lab_script
 
@@ -168,6 +169,95 @@ class BootstrapContractTests(unittest.TestCase):
                 write_access_output(path, "replacement")
             self.assertEqual("opaque-session-value", path.read_text())
 
+    def test_arr_download_client_bootstrap_is_idempotent_and_redacted(self):
+        from lab.controller.bootstrap import ensure_arr_download_client
+
+        class Client:
+            def __init__(self, service):
+                self.service = service
+                self.items = []
+                self.posts = []
+
+            def request(self, method, path, *, payload=None, expected=(200,), **_kwargs):
+                if method == "GET" and path == "/api/v3/downloadclient":
+                    return list(self.items)
+                if method == "GET" and path == "/api/v3/downloadclient/schema":
+                    category = "tvCategory" if self.service == "sonarr" else "movieCategory"
+                    return [
+                        {
+                            "implementation": "QBittorrent",
+                            "configContract": "QBittorrentSettings",
+                            "fields": [
+                                {"name": name, "value": None}
+                                for name in ("host", "port", "useSsl", "username", "password", category)
+                            ],
+                        }
+                    ]
+                if method == "POST" and path == "/api/v3/downloadclient":
+                    self.posts.append(payload)
+                    self.items = [dict(payload)]
+                    return payload
+                raise AssertionError((method, path, expected))
+
+        opaque_value = "synthetic-private-password"
+        for service in ("sonarr", "radarr"):
+            with self.subTest(service=service):
+                client = Client(service)
+                baseline = ensure_arr_download_client(
+                    client,
+                    service,
+                    {"username": "labadmin", "password": opaque_value},
+                )
+                second = ensure_arr_download_client(
+                    client,
+                    service,
+                    {"username": "labadmin", "password": opaque_value},
+                )
+                self.assertEqual(baseline, second)
+                self.assertEqual(1, len(client.posts))
+                self.assertEqual(
+                    {"download_clients": [{"implementation": "QBittorrent", "enabled": True}]},
+                    baseline,
+                )
+                self.assertNotIn(opaque_value, json.dumps(baseline, sort_keys=True))
+
+    def test_qbittorrent_bootstrap_repairs_owned_category_path_mismatch(self):
+        from lab.controller import bootstrap
+
+        class Client:
+            def __init__(self):
+                self.category = {"savePath": ""}
+                self.edits = []
+
+            def wait_json(self, path):
+                self.path = path
+
+            def request(self, method, path, *, form=None, expected=(200,), **_kwargs):
+                if method == "GET" and path == "/api/v2/torrents/categories":
+                    return {"arr-lab": dict(self.category)}
+                if method == "POST" and path == "/api/v2/torrents/editCategory":
+                    self.edits.append(dict(form or {}))
+                    self.category = {"savePath": form["savePath"]}
+                    return None
+                raise AssertionError((method, path, form, expected))
+
+        client = Client()
+        with (
+            mock.patch.object(bootstrap, "read_credential", return_value={"api_key": "opaque"}),
+            mock.patch.object(bootstrap, "HttpClient", return_value=client),
+        ):
+            state, baseline = bootstrap.bootstrap_qbittorrent()
+
+        self.assertEqual("baseline_verified", state)
+        self.assertEqual(
+            [{"category": "arr-lab", "savePath": "/data/downloads/arr-lab"}],
+            client.edits,
+        )
+        self.assertEqual(
+            {"categories": {"arr-lab": {"savePath": "/data/downloads/arr-lab"}}},
+            baseline,
+        )
+
     def test_last_json_object_ignores_buildkit_output(self):
         output = "#1 building\n#2 exporting\n{\"ok\":true,\"schema\":\"example.v1\"}\n"
         self.assertEqual({"ok": True, "schema": "example.v1"}, lab_script.last_json_object(output))
@@ -194,8 +284,14 @@ class BootstrapContractTests(unittest.TestCase):
         from lab.controller import bootstrap
 
         baselines = {
-            "sonarr": {"root_paths": ["/data/media/tv"]},
-            "radarr": {"root_paths": ["/data/media/movies"]},
+            "sonarr": {
+                "root_paths": ["/data/media/tv"],
+                "download_clients": [{"implementation": "QBittorrent", "enabled": True}],
+            },
+            "radarr": {
+                "root_paths": ["/data/media/movies"],
+                "download_clients": [{"implementation": "QBittorrent", "enabled": True}],
+            },
             "prowlarr": {
                 "applications": ["Radarr", "Sonarr"],
                 "indexers": ["Synthetic Mock Indexer"],

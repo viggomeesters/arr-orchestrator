@@ -135,6 +135,72 @@ def ensure_root_folder(client: HttpClient, path: str) -> dict[str, Any]:
     return {"root_paths": [path]}
 
 
+def ensure_arr_download_client(
+    client: HttpClient,
+    service: str,
+    qbittorrent: dict[str, str],
+) -> dict[str, Any]:
+    if service not in {"sonarr", "radarr"}:
+        raise BootstrapError("download client service is invalid")
+    if (
+        not isinstance(qbittorrent, dict)
+        or not isinstance(qbittorrent.get("username"), str)
+        or not qbittorrent["username"]
+        or not isinstance(qbittorrent.get("password"), str)
+        or not qbittorrent["password"]
+    ):
+        raise BootstrapError("qBittorrent download client credential is invalid")
+
+    def matches(items: Any) -> list[dict[str, Any]]:
+        if not isinstance(items, list) or any(not isinstance(item, dict) for item in items):
+            raise BootstrapError(f"{service} download client readback is invalid")
+        return [item for item in items if item.get("implementation") == "QBittorrent"]
+
+    current = matches(client.request("GET", "/api/v3/downloadclient"))
+    if len(current) > 1:
+        raise BootstrapError(f"{service} qBittorrent download client ownership is ambiguous")
+    if not current:
+        schemas = client.request("GET", "/api/v3/downloadclient/schema")
+        if not isinstance(schemas, list):
+            raise BootstrapError(f"{service} download client schema readback is invalid")
+        selected = [dict(item) for item in schemas if isinstance(item, dict) and item.get("implementation") == "QBittorrent"]
+        if len(selected) != 1:
+            raise BootstrapError(f"{service} qBittorrent download client schema is unavailable")
+        schema = selected[0]
+        fields = schema.get("fields")
+        if not isinstance(fields, list) or any(not isinstance(field, dict) for field in fields):
+            raise BootstrapError(f"{service} qBittorrent download client fields are invalid")
+        schema["fields"] = [dict(field) for field in fields]
+        schema.update(
+            {
+                "name": "Synthetic qBittorrent",
+                "enable": True,
+                "priority": 1,
+                "removeCompletedDownloads": True,
+                "removeFailedDownloads": True,
+                "tags": [],
+            }
+        )
+        values = {
+            "host": "qbittorrent",
+            "port": 8080,
+            "useSsl": False,
+            "username": qbittorrent["username"],
+            "password": qbittorrent["password"],
+            "tvCategory" if service == "sonarr" else "movieCategory": "arr-lab",
+        }
+        for name, value in values.items():
+            matches_for_field = [field for field in schema["fields"] if field.get("name") == name]
+            if len(matches_for_field) != 1:
+                raise BootstrapError(f"{service} qBittorrent field is unavailable: {name}")
+            matches_for_field[0]["value"] = value
+        client.request("POST", "/api/v3/downloadclient", payload=schema, expected=(201,))
+        current = matches(client.request("GET", "/api/v3/downloadclient"))
+    if len(current) != 1 or current[0].get("enable") is not True:
+        raise BootstrapError(f"{service} qBittorrent download client readback failed")
+    return {"download_clients": [{"implementation": "QBittorrent", "enabled": True}]}
+
+
 def set_schema_field(schema: dict[str, Any], name: str, value: Any) -> None:
     matches = [field for field in schema.get("fields", []) if field.get("name") == name]
     if len(matches) != 1:
@@ -222,8 +288,15 @@ def bootstrap_arr() -> tuple[dict[str, str], dict[str, Any]]:
         client.wait_json(version_path)
         clients[service] = client
         states[service] = "api_ready"
-    baselines["sonarr"] = ensure_root_folder(clients["sonarr"], "/data/media/tv")
-    baselines["radarr"] = ensure_root_folder(clients["radarr"], "/data/media/movies")
+    qbittorrent = read_credential("qbittorrent")
+    baselines["sonarr"] = {
+        **ensure_root_folder(clients["sonarr"], "/data/media/tv"),
+        **ensure_arr_download_client(clients["sonarr"], "sonarr", qbittorrent),
+    }
+    baselines["radarr"] = {
+        **ensure_root_folder(clients["radarr"], "/data/media/movies"),
+        **ensure_arr_download_client(clients["radarr"], "radarr", qbittorrent),
+    }
     mock_value = Path("/run/secrets/mock-indexer-token").read_text(encoding="utf-8").strip()
     ensure_prowlarr_indexer(clients["prowlarr"], mock_value)
     ensure_prowlarr_application(
@@ -257,8 +330,17 @@ def bootstrap_qbittorrent() -> tuple[str, dict[str, Any]]:
             form={"category": "arr-lab", "savePath": expected_path},
             expected=(200,),
         )
-        categories = client.request("GET", "/api/v2/torrents/categories")
-        existing = categories.get("arr-lab")
+    elif not isinstance(existing, dict):
+        raise BootstrapError("qbittorrent category ownership is ambiguous")
+    elif existing.get("savePath") != expected_path:
+        client.request(
+            "POST",
+            "/api/v2/torrents/editCategory",
+            form={"category": "arr-lab", "savePath": expected_path},
+            expected=(200,),
+        )
+    categories = client.request("GET", "/api/v2/torrents/categories")
+    existing = categories.get("arr-lab")
     if not isinstance(existing, dict) or existing.get("savePath") != expected_path:
         raise BootstrapError("qbittorrent category readback failed")
     return "baseline_verified", {"categories": {"arr-lab": {"savePath": expected_path}}}

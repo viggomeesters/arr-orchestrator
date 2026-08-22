@@ -18,10 +18,24 @@ RESOURCES = (
     "quality_profiles",
     "queue_summary",
 )
+DOWNLOAD_CLIENT_FIELDS = (
+    "id",
+    "name",
+    "implementation",
+    "protocol",
+    "enable",
+    "priority",
+    "removeCompletedDownloads",
+    "removeFailedDownloads",
+)
 
 
 class JsonTransport(Protocol):
     def get_json(self, path: str) -> dict[str, Any] | list[Any]: ...
+
+    def get_json_list_fields(
+        self, path: str, fields: tuple[str, ...]
+    ) -> list[dict[str, Any]]: ...
 
 
 class SonarrAdapterFailure(RuntimeError):
@@ -263,7 +277,19 @@ class SonarrAdapter:
 
     def _download_clients(self) -> tuple[SonarrDownloadClient, ...]:
         output = []
-        for raw in _sequence(self._read(f"{API_ROOT}/downloadclient")):
+        failure: SonarrAdapterFailure | None = None
+        payload: list[dict[str, Any]] | None = None
+        try:
+            payload = self.transport.get_json_list_fields(
+                f"{API_ROOT}/downloadclient", DOWNLOAD_CLIENT_FIELDS
+            )
+        except TransportFailure as error:
+            failure = SonarrAdapterFailure(error.code, retryable=error.retryable)
+        if failure is not None:
+            raise failure
+        if payload is None:
+            raise SonarrAdapterFailure("RESPONSE_SHAPE_INVALID")
+        for raw in _sequence(payload):
             item = _mapping(raw)
             output.append(
                 SonarrDownloadClient(

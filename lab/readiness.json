@@ -68,7 +68,7 @@
           "hard_deadline_seconds": 70,
           "credential_ref": "file:/run/secrets/sonarr-credential",
           "expected_schema_ref": "schema:sonarr-baseline",
-          "expected_baseline_digest": "sha256:aa37d8cdf0d378d20304362cba293f6edde571bbcdbc227bf16aa5349170d804"
+          "expected_baseline_digest": "sha256:60bfe9361503edd1086f72f7eed07da5b40dcfd53cf480e66fbf5cc4348df6cc"
         }
       }
     },
@@ -138,7 +138,7 @@
           "hard_deadline_seconds": 70,
           "credential_ref": "file:/run/secrets/radarr-credential",
           "expected_schema_ref": "schema:radarr-baseline",
-          "expected_baseline_digest": "sha256:812ca320f084ead9a82b04d7dcea2796e2ee7e8b08d34507521c30b21967cd0d"
+          "expected_baseline_digest": "sha256:8c4cf5fdc4ddcc38d75e6659801f41692b05b35e4d6753d35f257ca31dc90422"
         }
       }
     },

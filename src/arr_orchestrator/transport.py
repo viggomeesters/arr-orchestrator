@@ -29,6 +29,16 @@ PROJECTED_ENDPOINT_FIELDS = {
 PROJECTED_LIST_ENDPOINT_FIELDS = {
     "/api/v1/applications": ("id", "name", "implementation", "syncLevel"),
     "/api/v1/indexer": ("protocol", "privacy", "enable", "supportsRss", "supportsSearch"),
+    "/api/v3/downloadclient": (
+        "id",
+        "name",
+        "implementation",
+        "protocol",
+        "enable",
+        "priority",
+        "removeCompletedDownloads",
+        "removeFailedDownloads",
+    ),
 }
 
 
@@ -60,6 +70,7 @@ def _projection_required_alias(path: object) -> bool:
     ) or segments in (
         ["api", "v1", "applications"],
         ["api", "v1", "indexer"],
+        ["api", "v3", "downloadclient"],
     )
 
 

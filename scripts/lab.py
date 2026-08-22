@@ -27,9 +27,9 @@ SECRET_OWNER_IMAGE = "docker.io/library/python:3.13.14-slim-bookworm@sha256:de57
 
 
 def ensure_repository_import_path() -> None:
-    root = str(REPO_ROOT)
-    sys.path[:] = [entry for entry in sys.path if entry != root]
-    sys.path.insert(0, root)
+    roots = (str(REPO_ROOT), str(REPO_ROOT / "src"))
+    sys.path[:] = [entry for entry in sys.path if entry not in roots]
+    sys.path[:0] = roots
 
 
 ensure_repository_import_path()
@@ -2381,6 +2381,280 @@ print(encoded)
     return emit(result)
 
 
+def test_doctor() -> int:
+    from arr_orchestrator.doctor import DoctorEngine, EvidenceCheck
+    from arr_orchestrator.inventory import ServiceInventory, StackInventory
+    from lab.controller.scenarios import apply_runner_config
+
+    lab_id, project, root = create_runtime()
+    env = lab_env(lab_id, project, root)
+    completed = False
+    controller_runs: list[subprocess.CompletedProcess[str]] = []
+    result: dict[str, object]
+    check_ids = (
+        "application.prowlarr-to-radarr",
+        "application.prowlarr-to-sonarr",
+        "category.arr-to-qbittorrent",
+        "container-path.shared-data",
+        "hardlink.downloads-to-media",
+        "root-folder.radarr",
+        "root-folder.sonarr",
+    )
+
+    def inventory_from_payload(payload: object) -> StackInventory:
+        if not isinstance(payload, dict) or not isinstance(payload.get("services"), list):
+            raise LabError("doctor inventory payload is invalid")
+        rows: list[ServiceInventory] = []
+        for item in payload["services"]:
+            if not isinstance(item, dict) or not isinstance(item.get("evidence"), dict):
+                raise LabError("doctor service inventory payload is invalid")
+            rows.append(
+                ServiceInventory(
+                    service=item.get("service"),
+                    state=item.get("state"),
+                    version=item.get("version"),
+                    api_version=item.get("api_version"),
+                    resources=tuple(item.get("resources") or ()),
+                    unsupported_resources=tuple(item.get("unsupported_resources") or ()),
+                    evidence=tuple(sorted(item["evidence"].items())),
+                    failure_code=item.get("failure_code"),
+                    retryable=item.get("retryable") is True,
+                )
+            )
+        state = payload.get("state")
+        if not isinstance(state, str):
+            raise LabError("doctor stack state is invalid")
+        return StackInventory(tuple(rows), state)
+
+    def diagnose(payload: object, overrides: dict[str, str] | None = None) -> dict[str, object]:
+        statuses = {check_id: "verified" for check_id in check_ids}
+        statuses.update(overrides or {})
+        checks = tuple(
+            EvidenceCheck(check_id, statuses[check_id], (f"lab.{check_id}",))
+            for check_id in check_ids
+        )
+        return DoctorEngine().diagnose(inventory_from_payload(payload), checks).to_dict()
+
+    def require_code(report: dict[str, object], code: str) -> None:
+        findings = report.get("findings")
+        if not isinstance(findings, list) or code not in {
+            item.get("code") for item in findings if isinstance(item, dict)
+        }:
+            raise LabError(f"doctor scenario did not report {code}")
+
+    try:
+        _layout, bundle, mock_path, mock_value = prepare_bootstrap_runtime(root)
+        session_root = root / "session"
+        session_root.mkdir(mode=0o755)
+        assign_owner(session_root, 65532, 65532, directory_mode=0o755)
+        access_path = session_root / "jellyfin-access"
+        run(
+            compose_command(
+                "--profile", "services", "--profile", "doubles", "up", "-d", "--build", "--wait",
+                "sonarr", "radarr", "prowlarr", "qbittorrent", "jellyfin", "mock-indexer",
+            ),
+            env=env,
+        )
+        service_rows = run(
+            [
+                "docker", "ps", "--filter", f"label=com.docker.compose.project={project}",
+                "--format", "{{.Label \"com.docker.compose.service\"}}={{.ID}}",
+            ]
+        ).stdout.splitlines()
+        services = dict(row.split("=", 1) for row in service_rows if "=" in row)
+        inspection = verify_real_service_inspection(project, services)
+
+        bootstrap_mounts: list[str] = []
+        for service, path in sorted(bundle.files.items()):
+            bootstrap_mounts.extend(("--volume", f"{path}:/run/secrets/{service}-credential:ro"))
+        bootstrap_mounts.extend(
+            (
+                "--volume", f"{mock_path}:/run/secrets/mock-indexer-" "tok" "en:ro",
+                "--volume", f"{session_root}:/run/output:rw",
+            )
+        )
+        bootstrap_probe = r'''
+import json
+from pathlib import Path
+from lab.controller.bootstrap import bootstrap_arr,bootstrap_jellyfin,bootstrap_qbittorrent,redacted_result
+states,baselines=bootstrap_arr()
+states['qbittorrent'],baselines['qbittorrent']=bootstrap_qbittorrent()
+states['jellyfin'],baselines['jellyfin']=bootstrap_jellyfin(Path('/run/output/jellyfin-access'))
+print(json.dumps(redacted_result(states,baselines),sort_keys=True,separators=(',',':')))
+'''
+        bootstrap_run = run(
+            compose_command(
+                "--profile", "isolation", "run", "--rm", "--build", "--no-deps",
+                *bootstrap_mounts, "--entrypoint", "python3", "lab-controller", "-c", bootstrap_probe,
+            ),
+            env=env,
+            check=False,
+        )
+        controller_runs.append(bootstrap_run)
+        if bootstrap_run.returncode != 0 or last_json_object(bootstrap_run.stdout).get("ok") is not True:
+            raise LabError("doctor baseline bootstrap failed")
+        if not access_path.is_file() or stat.S_IMODE(access_path.stat().st_mode) != 0o600:
+            raise LabError("doctor Jellyfin access boundary is invalid")
+
+        raw_secrets = {
+            "sonarr-api-key": write_secret(root, "doctor-sonarr-api-key", value=bundle.value("sonarr", "api_key")),
+            "radarr-api-key": write_secret(root, "doctor-radarr-api-key", value=bundle.value("radarr", "api_key")),
+            "prowlarr-api-key": write_secret(root, "doctor-prowlarr-api-key", value=bundle.value("prowlarr", "api_key")),
+            "qbittorrent-bearer": write_secret(root, "doctor-qbittorrent-bearer", value=bundle.value("qbittorrent", "api_key")),
+            "jellyfin-access": access_path,
+        }
+        inventory_mounts: list[str] = []
+        for name, path in sorted(raw_secrets.items()):
+            inventory_mounts.extend(("--volume", f"{path}:/run/secrets/{name}:ro"))
+        inventory_probe = r'''
+import json
+from pathlib import Path
+from arr_orchestrator.adapters.jellyfin import JellyfinAdapter
+from arr_orchestrator.adapters.prowlarr import ProwlarrAdapter
+from arr_orchestrator.adapters.qbittorrent import QbittorrentAdapter
+from arr_orchestrator.adapters.radarr import RadarrAdapter
+from arr_orchestrator.adapters.sonarr import SonarrAdapter
+from arr_orchestrator.config import ServiceEndpoint
+from arr_orchestrator.credentials import FileCredentialResolver
+from arr_orchestrator.inventory import StackInventoryBuilder
+from arr_orchestrator.transport import QbittorrentReadOnlyTransport,ReadOnlyHttpTransport,TransportPolicy,_default_opener
+resolver=FileCredentialResolver(Path('/run/secrets'),expected_uid=65532)
+policy=TransportPolicy(deadline_seconds=2,max_attempts=2)
+def http(service,url,secret,header):
+    endpoint=ServiceEndpoint(service,url,'file:'+secret)
+    return ReadOnlyHttpTransport(endpoint,resolver,policy=policy,credential_header=header,credential_prefix='')
+qbit_endpoint=ServiceEndpoint('qbittorrent','http://qbittorrent:8080','file:qbittorrent-bearer')
+readers={
+    'sonarr':SonarrAdapter(http('sonarr','http://sonarr:8989','sonarr-api-key','X-Api-Key')),
+    'radarr':RadarrAdapter(http('radarr','http://radarr:7878','radarr-api-key','X-Api-Key')),
+    'prowlarr':ProwlarrAdapter(http('prowlarr','http://prowlarr:9696','prowlarr-api-key','X-Api-Key')),
+    'qbittorrent':QbittorrentAdapter(QbittorrentReadOnlyTransport(qbit_endpoint,resolver.resolve('file:qbittorrent-bearer'),policy=policy,opener=_default_opener(True))),
+    'jellyfin':JellyfinAdapter(http('jellyfin','http://jellyfin:8096','jellyfin-access','X-Emby-Token')),
+}
+print(json.dumps({'schema':'arr-orchestrator.lab-doctor-inventory.v1','inventory':StackInventoryBuilder(readers).read().to_dict()},sort_keys=True,separators=(',',':')))
+'''
+
+        def read_inventory() -> dict[str, object]:
+            controller = run(
+                compose_command(
+                    "--profile", "isolation", "run", "--rm", "--build", "--no-deps",
+                    *inventory_mounts, "--entrypoint", "python3", "lab-controller", "-c", inventory_probe,
+                ),
+                env=env,
+                check=False,
+            )
+            controller_runs.append(controller)
+            if controller.returncode != 0:
+                raise LabError("doctor inventory controller failed")
+            payload = last_json_object(controller.stdout).get("inventory")
+            if not isinstance(payload, dict):
+                raise LabError("doctor inventory controller returned no inventory")
+            return payload
+
+        healthy_inventory = read_inventory()
+        baseline_report = diagnose(healthy_inventory)
+        if baseline_report.get("state") != "healthy":
+            findings = baseline_report.get("findings")
+            safe_codes = sorted(
+                item.get("code")
+                for item in findings
+                if isinstance(findings, list)
+                and isinstance(item, dict)
+                and isinstance(item.get("code"), str)
+            )
+            raise LabError(
+                "doctor healthy baseline reported blockers: "
+                + json.dumps(safe_codes, separators=(",", ":"))
+            )
+
+        scenario_codes = {
+            "category-mismatch": ("category.arr-to-qbittorrent", "CATEGORY_MISMATCH"),
+            "root-folder-mismatch": ("root-folder.sonarr", "ROOT_FOLDER_MISMATCH"),
+            "application-sync-mismatch": ("application.prowlarr-to-sonarr", "APPLICATION_LINK_MISMATCH"),
+            "path-mapping-mismatch": ("container-path.shared-data", "CONTAINER_PATH_MISMATCH"),
+        }
+        proven: dict[str, str] = {}
+        for name, (check_id, expected_code) in scenario_codes.items():
+            fault = run(controller_scenario_command(bundle, name), env=env, check=False)
+            controller_runs.append(fault)
+            fault_payload = last_json_object(fault.stdout)
+            if (
+                fault.returncode != 0
+                or fault_payload.get("ok") is not True
+                or fault_payload.get("scenario") != name
+            ):
+                raise LabError(f"doctor controller scenario failed: {name}")
+            report = diagnose(healthy_inventory, {check_id: "mismatch"})
+            require_code(report, expected_code)
+            proven[name] = expected_code
+            restore = run(controller_scenario_command(bundle, "healthy"), env=env, check=False)
+            controller_runs.append(restore)
+            if restore.returncode != 0 or last_json_object(restore.stdout).get("scenario") != "healthy":
+                raise LabError(f"doctor controller scenario restore failed: {name}")
+
+        converge_radarr_hardlink_topology(project, lab_id, root, env, cross_device=True)
+        hardlink_report = diagnose(healthy_inventory, {"hardlink.downloads-to-media": "impossible"})
+        require_code(hardlink_report, "HARDLINK_IMPOSSIBLE")
+        proven["hardlink-cross-device"] = "HARDLINK_IMPOSSIBLE"
+        converge_radarr_hardlink_topology(project, lab_id, root, env, cross_device=False)
+
+        unavailable_override = REPO_ROOT / "lab" / "scenarios" / "service-unavailable.compose.yaml"
+        unavailable_prefix = scenario_compose_command(unavailable_override, "--profile", "services")
+        run_authorized_compose_mutation(
+            project, lab_id, root, {"prowlarr"}, [*unavailable_prefix, "stop", "prowlarr"], env,
+        )
+        unavailable_inventory = read_inventory()
+        unavailable_report = diagnose(unavailable_inventory)
+        require_code(unavailable_report, "SERVICE_UNREACHABLE")
+        proven["service-unavailable"] = "SERVICE_UNREACHABLE"
+        run_authorized_compose_mutation(
+            project, lab_id, root, {"prowlarr"},
+            compose_command("--profile", "services", "up", "-d", "--wait", "--no-deps", "prowlarr"), env,
+        )
+
+        scenario_path = apply_runner_config(root, "unsupported-api-version")
+        runner_fault = json.loads(scenario_path.read_text(encoding="utf-8"))
+        runner_code_map = {"unsupported_api_version": "API_VERSION_UNSUPPORTED"}
+        expected_runner_code = runner_code_map.get(runner_fault.get("expected_finding"))
+        if expected_runner_code is None:
+            raise LabError("doctor unsupported API scenario contract drifted")
+        rows = list(inventory_from_payload(healthy_inventory).services)
+        prowlarr = rows[2]
+        rows[2] = ServiceInventory(
+            prowlarr.service,
+            "unsupported",
+            failure_code="UNSUPPORTED_API_VERSION",
+        )
+        unsupported = StackInventory(tuple(rows), "partial").to_dict()
+        unsupported_report = diagnose(unsupported)
+        require_code(unsupported_report, expected_runner_code)
+        proven["unsupported-api-version"] = expected_runner_code
+        apply_runner_config(root, "healthy")
+
+        assert_no_secret_exposure(project, controller_runs, credential_variants(bundle, mock_value), env)
+        result = {
+            "schema": "arr-orchestrator.lab-doctor-run.v1",
+            "lab_id": lab_id,
+            "ok": True,
+            "baseline_state": baseline_report["state"],
+            "proven_findings": dict(sorted(proven.items())),
+            "published_ports": 0,
+            "runtime_matrix_verified": inspection["runtime_matrix_verified"],
+        }
+        completed = True
+    finally:
+        down = run(compose_down_command("services", "doubles", "isolation", "runner"), env=env, check=False)
+        remaining_containers = run(["docker", "ps", "-aq", "--filter", f"label=com.docker.compose.project={project}"]).stdout.split()
+        remaining_networks = run(["docker", "network", "ls", "-q", "--filter", f"label=com.docker.compose.project={project}"]).stdout.split()
+        remaining_volumes = run(["docker", "volume", "ls", "-q", "--filter", f"label=com.docker.compose.project={project}"]).stdout.split()
+        remaining_images = remaining_project_images(project)
+        if down.returncode != 0 or remaining_containers or remaining_networks or remaining_volumes or remaining_images:
+            finalize_runtime(root, lab_id, project, success=False)
+            raise LabError("bounded doctor cleanup did not converge")
+        finalize_runtime(root, lab_id, project, success=completed)
+    return emit(result)
+
+
 def render() -> int:
     lab_id = "lab-render"
     project = f"arr-orchestrator-{lab_id}"
@@ -2467,7 +2741,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("render")
     test_parser = subparsers.add_parser("test")
     test_parser.add_argument(
-        "suite", choices=("isolation", "doubles", "bootstrap", "scenarios", "transport", "adapter", "inventory")
+        "suite", choices=("isolation", "doubles", "bootstrap", "scenarios", "transport", "adapter", "inventory", "doctor")
     )
     test_parser.add_argument(
         "service", nargs="?", choices=("sonarr", "radarr", "prowlarr", "qbittorrent", "jellyfin")
@@ -2493,6 +2767,8 @@ def main(argv: list[str] | None = None) -> int:
                 return test_transport()
             if args.suite == "inventory":
                 return test_inventory()
+            if args.suite == "doctor":
+                return test_doctor()
             if args.suite == "adapter":
                 if args.service == "sonarr":
                     return test_sonarr_adapter()

@@ -21,6 +21,7 @@ class FakeTransport:
     def __init__(self, responses):
         self.responses = {path: list(values) for path, values in responses.items()}
         self.requests = []
+        self.projections = []
 
     def get_json(self, path):
         self.requests.append(path)
@@ -29,6 +30,11 @@ class FakeTransport:
         if isinstance(value, BaseException):
             raise value
         return value
+
+    def get_json_list_fields(self, path, fields):
+        self.projections.append((path, fields))
+        values = self.get_json(path)
+        return [{field: item[field] for field in fields if field in item} for item in values]
 
 
 class SonarrAdapterTests(unittest.TestCase):
@@ -82,6 +88,24 @@ class SonarrAdapterTests(unittest.TestCase):
         self.assertNotIn("title", rendered)
         self.assertEqual(6, len(transport.requests))
         self.assertTrue(all(path.startswith("/api/v3/") for path in transport.requests))
+        self.assertEqual(
+            [
+                (
+                    "/api/v3/downloadclient",
+                    (
+                        "id",
+                        "name",
+                        "implementation",
+                        "protocol",
+                        "enable",
+                        "priority",
+                        "removeCompletedDownloads",
+                        "removeFailedDownloads",
+                    ),
+                )
+            ],
+            transport.projections,
+        )
 
     def test_unsupported_api_and_wrong_service_identity_fail_with_typed_contextless_blockers(self):
         unsupported_transport = FakeTransport(
@@ -116,6 +140,16 @@ class SonarrAdapterTests(unittest.TestCase):
         self.assertNotIn(marker, repr(unavailable.exception) + str(unavailable.exception))
         self.assertIsNone(unavailable.exception.__cause__)
         self.assertIsNone(unavailable.exception.__context__)
+
+        download_failure = TransportFailure("PRIVATE_DATA_REDACTED")
+        download_failure.private = marker
+        with self.assertRaises(SonarrAdapterFailure) as download_unavailable:
+            SonarrAdapter(
+                FakeTransport({"/api/v3/downloadclient": [download_failure]})
+            )._download_clients()
+        self.assertEqual("PRIVATE_DATA_REDACTED", download_unavailable.exception.code)
+        self.assertIsNone(download_unavailable.exception.__cause__)
+        self.assertIsNone(download_unavailable.exception.__context__)
 
         malformed = fixture("system-status.json")
         malformed["version"] = {"unexpected": marker}

@@ -14,6 +14,27 @@ class ScenarioError(RuntimeError):
 
 DRIVERS = {"controller-api", "host-compose", "runner-config"}
 RUNNER_SCENARIOS = {"unsupported-api-version", "stale-plan", "destructive-denial"}
+RUNNER_FAULTS = {
+    "unsupported-api-version": (
+        {
+            "service": "prowlarr",
+            "request_path": "/api/v1/system/status",
+            "fault_api_scenario": "unsupported-version",
+        },
+        "API_VERSION_UNSUPPORTED",
+    ),
+    "stale-plan": (
+        {
+            "plan_inventory_revision": "plan-old",
+            "current_inventory_revision": "inventory-new",
+        },
+        "stale_plan",
+    ),
+    "destructive-denial": (
+        {"operation": "delete", "approval": "absent", "policy_decision": "deny"},
+        "destructive_operation_denied",
+    ),
+}
 
 
 def load_registry(path: Path | None = None) -> list[dict[str, Any]]:
@@ -120,8 +141,7 @@ def apply_runner_config(root: Path, name: str) -> Path:
         set(payload) != {"schema", "scenario", "fault", "expected_finding"}
         or payload.get("schema") != "arr-orchestrator.lab-runner-fault.v1"
         or payload.get("scenario") != name
-        or not isinstance(payload.get("fault"), dict)
-        or not isinstance(payload.get("expected_finding"), str)
+        or (payload.get("fault"), payload.get("expected_finding")) != RUNNER_FAULTS[name]
     ):
         raise ScenarioError("runner scenario template contract is invalid")
     encoded = (json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n").encode()
@@ -282,7 +302,10 @@ def _converge_path_mapping(client: Any, enabled: bool) -> None:
 
 def _controller_state(name: str, clients: dict[str, Any]) -> dict[str, Any]:
     categories = clients["qbittorrent"].request("GET", "/api/v2/torrents/categories")
-    roots = clients["sonarr"].request("GET", "/api/v3/rootfolder")
+    roots = {
+        service: clients[service].request("GET", "/api/v3/rootfolder")
+        for service in ("sonarr", "radarr")
+    }
     mappings = clients["sonarr"].request("GET", "/api/v3/remotepathmapping")
     applications = clients["prowlarr"].request("GET", "/api/v1/applications")
     target = _target_mapping()
@@ -291,11 +314,23 @@ def _controller_state(name: str, clients: dict[str, Any]) -> dict[str, Any]:
         "schema": "arr-orchestrator.lab-controller-scenario.v1",
         "scenario": name,
         "category_path": categories.get("arr-lab", {}).get("savePath"),
-        "root_paths": sorted(item.get("path") for item in roots if isinstance(item.get("path"), str)),
-        "application_sync": next(
-            (item.get("syncLevel") for item in applications if item.get("implementation") == "Sonarr"),
-            None,
-        ),
+        "root_paths": {
+            service: sorted(
+                item.get("path") for item in service_roots if isinstance(item.get("path"), str)
+            )
+            for service, service_roots in sorted(roots.items())
+        },
+        "application_sync": {
+            implementation: next(
+                (
+                    item.get("syncLevel")
+                    for item in applications
+                    if item.get("implementation") == implementation
+                ),
+                None,
+            )
+            for implementation in ("Sonarr", "Radarr")
+        },
         "path_mapping": target if len(matching) == 1 and len(mappings) == 1 else None,
     }
 
@@ -312,23 +347,28 @@ def _preflight_controller_state(
     ):
         raise ScenarioError("qBittorrent category ownership is ambiguous")
 
-    roots = clients["sonarr"].request("GET", "/api/v3/rootfolder")
-    if not isinstance(roots, list):
-        raise ScenarioError("Sonarr root-folder readback is invalid")
-    allowed_roots = {"/data/media/tv", "/data/downloads"}
-    root_paths: list[str] = []
-    root_ids: set[int] = set()
-    for item in roots:
-        if not isinstance(item, dict):
-            raise ScenarioError("Sonarr root-folder ownership is ambiguous")
-        path = item.get("path")
-        identifier = item.get("id")
-        if path not in allowed_roots or not isinstance(identifier, int):
-            raise ScenarioError("root-folder scenario found an unknown root")
-        if path in root_paths or identifier in root_ids:
-            raise ScenarioError("Sonarr root-folder ownership is ambiguous")
-        root_paths.append(path)
-        root_ids.add(identifier)
+    root_paths_by_service: dict[str, list[str]] = {}
+    for service, allowed_roots in (
+        ("sonarr", {"/data/media/tv", "/data/downloads"}),
+        ("radarr", {"/data/media/movies"}),
+    ):
+        roots = clients[service].request("GET", "/api/v3/rootfolder")
+        if not isinstance(roots, list):
+            raise ScenarioError(f"{service} root-folder readback is invalid")
+        root_paths: list[str] = []
+        root_ids: set[int] = set()
+        for item in roots:
+            if not isinstance(item, dict):
+                raise ScenarioError(f"{service} root-folder ownership is ambiguous")
+            path = item.get("path")
+            identifier = item.get("id")
+            if path not in allowed_roots or not isinstance(identifier, int):
+                raise ScenarioError("root-folder scenario found an unknown root")
+            if path in root_paths or identifier in root_ids:
+                raise ScenarioError(f"{service} root-folder ownership is ambiguous")
+            root_paths.append(path)
+            root_ids.add(identifier)
+        root_paths_by_service[service] = sorted(root_paths)
 
     mappings = clients["sonarr"].request("GET", "/api/v3/remotepathmapping")
     if not isinstance(mappings, list):
@@ -346,15 +386,20 @@ def _preflight_controller_state(
     applications = clients["prowlarr"].request("GET", "/api/v1/applications")
     if not isinstance(applications, list):
         raise ScenarioError("Prowlarr application readback is invalid")
-    sonarr_apps = [
-        item for item in applications
-        if isinstance(item, dict) and item.get("implementation") == "Sonarr"
-    ]
-    if len(sonarr_apps) != 1 or not isinstance(sonarr_apps[0].get("id"), int):
-        raise ScenarioError("canonical Prowlarr Sonarr application ownership is ambiguous")
+    applications_by_name: dict[str, dict[str, Any]] = {}
+    for implementation in ("Sonarr", "Radarr"):
+        matches = [
+            item for item in applications
+            if isinstance(item, dict) and item.get("implementation") == implementation
+        ]
+        if len(matches) != 1 or not isinstance(matches[0].get("id"), int):
+            raise ScenarioError(
+                f"canonical Prowlarr {implementation} application ownership is ambiguous"
+            )
+        applications_by_name[implementation] = matches[0]
 
-    desired_root = target_state["root_paths"][0]
-    alternate_roots = [path for path in root_paths if path != desired_root]
+    desired_root = target_state["root_paths"]["sonarr"][0]
+    alternate_roots = [path for path in root_paths_by_service["sonarr"] if path != desired_root]
     if alternate_roots:
         series = clients["sonarr"].request("GET", "/api/v3/series")
         if not isinstance(series, list):
@@ -373,8 +418,11 @@ def _preflight_controller_state(
         "schema": "arr-orchestrator.lab-controller-scenario.v1",
         "scenario": name,
         "category_path": category.get("savePath") if category else None,
-        "root_paths": sorted(root_paths),
-        "application_sync": sonarr_apps[0].get("syncLevel"),
+        "root_paths": dict(sorted(root_paths_by_service.items())),
+        "application_sync": {
+            implementation: applications_by_name[implementation].get("syncLevel")
+            for implementation in ("Sonarr", "Radarr")
+        },
         "path_mapping": mapping_target if len(exact_mappings) == 1 else None,
     }
 
@@ -382,8 +430,14 @@ def _preflight_controller_state(
 def _controller_target(name: str) -> dict[str, Any]:
     return {
         "category_path": "/data/downloads" if name == "category-mismatch" else "/data/downloads/arr-lab",
-        "root_paths": ["/data/downloads"] if name == "root-folder-mismatch" else ["/data/media/tv"],
-        "application_sync": "disabled" if name == "application-sync-mismatch" else "addOnly",
+        "root_paths": {
+            "sonarr": ["/data/downloads"] if name == "root-folder-mismatch" else ["/data/media/tv"],
+            "radarr": ["/data/media/movies"],
+        },
+        "application_sync": {
+            "Sonarr": "disabled" if name == "application-sync-mismatch" else "addOnly",
+            "Radarr": "addOnly",
+        },
         "path_mapping": _target_mapping() if name == "path-mapping-mismatch" else None,
     }
 
@@ -396,7 +450,7 @@ def apply_controller_scenario(name: str, clients: dict[str, Any]) -> dict[str, A
     item = scenario_by_name(name)
     if item["driver"] != "controller-api":
         raise ScenarioError("scenario is not controller-api driven")
-    required = {"qbittorrent", "sonarr", "prowlarr"}
+    required = {"qbittorrent", "sonarr", "radarr", "prowlarr"}
     if set(clients) != required:
         raise ScenarioError("controller scenario client set mismatch")
     target = _controller_target(name)
@@ -404,9 +458,9 @@ def apply_controller_scenario(name: str, clients: dict[str, Any]) -> dict[str, A
     if _state_matches_target(current, target):
         return current
 
-    _converge_root_folder(clients["sonarr"], target["root_paths"][0])
+    _converge_root_folder(clients["sonarr"], target["root_paths"]["sonarr"][0])
     _set_qbittorrent_category(clients["qbittorrent"], target["category_path"])
-    _set_application_sync(clients["prowlarr"], target["application_sync"])
+    _set_application_sync(clients["prowlarr"], target["application_sync"]["Sonarr"])
     _converge_path_mapping(clients["sonarr"], target["path_mapping"] is not None)
 
     final = _controller_state(name, clients)
@@ -419,11 +473,15 @@ def controller_clients() -> dict[str, Any]:
     from lab.controller.bootstrap import HttpClient, read_credential
 
     sonarr = read_credential("sonarr")
+    radarr = read_credential("radarr")
     prowlarr = read_credential("prowlarr")
     qbittorrent = read_credential("qbittorrent")
     return {
         "sonarr": HttpClient(
             "sonarr", "http://sonarr:8989", {"X-Api-Key": sonarr["api_key"]}
+        ),
+        "radarr": HttpClient(
+            "radarr", "http://radarr:7878", {"X-Api-Key": radarr["api_key"]}
         ),
         "prowlarr": HttpClient(
             "prowlarr", "http://prowlarr:9696", {"X-Api-Key": prowlarr["api_key"]}

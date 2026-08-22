@@ -37,6 +37,17 @@ def response_for(scenario: str) -> tuple[float, int, str, bytes]:
         raise ValueError("unsupported scenario") from error
 
 
+def prowlarr_status_response(scenario: str) -> tuple[float, int, str, bytes]:
+    if scenario == "unsupported-version":
+        return 0.0, 404, "application/json", b'{"error":"unsupported_api_version"}'
+    return (
+        0.0,
+        200,
+        "application/json",
+        b'{"appName":"Prowlarr","version":"2.0.5.5160"}',
+    )
+
+
 class ScenarioState:
     def __init__(self) -> None:
         self._scenario = "healthy"
@@ -96,6 +107,12 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/scenario":
             body = json.dumps({"scenario": STATE.get()}, separators=(",", ":")).encode("utf-8")
             self.write_response(200, "application/json", body)
+            return
+        if path == "/api/v1/system/status":
+            delay, status, content_type, body = prowlarr_status_response(STATE.get())
+            if delay:
+                time.sleep(delay)
+            self.write_response(status, content_type, body)
             return
         if path != "/api/v1/probe":
             self.write_response(404, "application/json", b'{"error":"not_found"}')

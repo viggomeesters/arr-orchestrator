@@ -1586,7 +1586,7 @@ def controller_bootstrap_command(bundle, mock_path: Path) -> list[str]:
 
 def controller_scenario_command(bundle, name: str) -> list[str]:
     mount_args: list[str] = []
-    for service in ("sonarr", "prowlarr", "qbittorrent"):
+    for service in ("sonarr", "radarr", "prowlarr", "qbittorrent"):
         path = bundle.files[service]
         mount_args.extend(("--volume", f"{path}:/run/secrets/{service}-credential:ro"))
     return compose_command(
@@ -1844,6 +1844,36 @@ def prowlarr_connectivity_command() -> list[str]:
     )
 
 
+def shared_data_mount_identity(sources: dict[str, dict[str, str]]) -> bool:
+    expected_targets = {
+        "sonarr": {"/data"},
+        "radarr": {"/data"},
+        "qbittorrent": {"/data/downloads"},
+        "jellyfin": {"/data/media/tv", "/data/media/movies"},
+    }
+    if type(sources) is not dict or any(type(service) is not str for service in sources):
+        return False
+    if set(sources) != set(expected_targets):
+        return False
+    if any(
+        type(mounts) is not dict
+        or any(type(target) is not str or type(source) is not str for target, source in mounts.items())
+        or set(mounts) != expected_targets[service]
+        for service, mounts in sources.items()
+    ):
+        return False
+    sonarr_root = Path(sources["sonarr"]["/data"]).resolve()
+    return (
+        Path(sources["radarr"]["/data"]).resolve() == sonarr_root
+        and Path(sources["qbittorrent"]["/data/downloads"]).resolve()
+        == sonarr_root / "downloads"
+        and Path(sources["jellyfin"]["/data/media/tv"]).resolve()
+        == sonarr_root / "media" / "tv"
+        and Path(sources["jellyfin"]["/data/media/movies"]).resolve()
+        == sonarr_root / "media" / "movies"
+    )
+
+
 def verify_real_service_inspection(project: str, services: dict[str, str]) -> dict[str, object]:
     expected_real = {"sonarr", "radarr", "prowlarr", "qbittorrent", "jellyfin"}
     if set(services) != expected_real | {"mock-indexer"}:
@@ -1860,6 +1890,13 @@ def verify_real_service_inspection(project: str, services: dict[str, str]) -> di
         "prowlarr": "Prowlarr",
         "qbittorrent": "qbittorrent-nox",
         "jellyfin": "jellyfin",
+    }
+    shared_mount_sources: dict[str, dict[str, str]] = {}
+    shared_targets = {
+        "sonarr": {"/data"},
+        "radarr": {"/data"},
+        "qbittorrent": {"/data/downloads"},
+        "jellyfin": {"/data/media/tv", "/data/media/movies"},
     }
     for service in sorted(expected_real):
         container_id = services[service]
@@ -1879,6 +1916,12 @@ def verify_real_service_inspection(project: str, services: dict[str, str]) -> di
         writable = {mount["Destination"] for mount in mounts if mount.get("RW")}
         if writable != expected_writable[service]:
             raise LabError(f"{service} writable mounts do not match the security matrix")
+        if service in shared_targets:
+            shared_mount_sources[service] = {
+                mount["Destination"]: mount["Source"]
+                for mount in mounts
+                if mount.get("Type") == "bind" and mount.get("Destination") in shared_targets[service]
+            }
         health = container.get("State", {}).get("Health", {}).get("Status")
         if health != "healthy":
             raise LabError(f"{service} is not healthy")
@@ -1892,17 +1935,27 @@ def verify_real_service_inspection(project: str, services: dict[str, str]) -> di
             for row in process_rows
         ):
             raise LabError(f"{service} long-running UID does not match the security matrix")
+    if not shared_data_mount_identity(shared_mount_sources):
+        raise LabError("shared data mount identity is invalid")
     verify_double_container(project, services["mock-indexer"], "mock-indexer-token")
-    return {"real_services": sorted(expected_real), "runtime_matrix_verified": True, "published_ports": 0}
+    return {
+        "real_services": sorted(expected_real),
+        "runtime_matrix_verified": True,
+        "shared_data_mount_verified": True,
+        "published_ports": 0,
+    }
 
 
-def credential_variants(bundle, mock_value: str) -> dict[str, str]:
+def credential_variants(
+    bundle, mock_value: str, additional: dict[str, str] | None = None
+) -> dict[str, str]:
     raw_values = {"mock-indexer.value": mock_value}
     for service in ("sonarr", "radarr", "prowlarr"):
         raw_values[f"{service}.api-key"] = bundle.value(service, "api_key")
     for service in ("qbittorrent", "jellyfin"):
         raw_values[f"{service}.credential"] = bundle.value(service, "password")
     raw_values["qbittorrent.api-key"] = bundle.value("qbittorrent", "api_key")
+    raw_values.update(additional or {})
     variants: dict[str, str] = {}
     for label, value in raw_values.items():
         for encoding, variant in (
@@ -2381,6 +2434,98 @@ print(encoded)
     return emit(result)
 
 
+def doctor_statuses_from_observation(
+    observation: dict[str, object],
+    *,
+    shared_mounts_verified: bool,
+    hardlink_status: str,
+) -> dict[str, str]:
+    expected_keys = {
+        "schema",
+        "scenario",
+        "category_path",
+        "root_paths",
+        "application_sync",
+        "path_mapping",
+    }
+    if (
+        type(observation) is not dict
+        or any(type(key) is not str for key in observation)
+        or set(observation) != expected_keys
+        or type(observation.get("schema")) is not str
+        or observation.get("schema") != "arr-orchestrator.lab-controller-scenario.v1"
+        or type(observation.get("scenario")) is not str
+        or type(shared_mounts_verified) is not bool
+    ):
+        raise LabError("doctor observation contract is invalid")
+    category_path = observation["category_path"]
+    if category_path is not None and type(category_path) is not str:
+        raise LabError("doctor observation contract is invalid")
+    root_paths = observation["root_paths"]
+    if (
+        type(root_paths) is not dict
+        or any(type(key) is not str for key in root_paths)
+        or set(root_paths) != {"sonarr", "radarr"}
+        or any(
+            type(paths) is not list or any(type(path) is not str for path in paths)
+            for paths in root_paths.values()
+        )
+    ):
+        raise LabError("doctor observation contract is invalid")
+    application_sync = observation["application_sync"]
+    if (
+        type(application_sync) is not dict
+        or any(type(key) is not str for key in application_sync)
+        or set(application_sync) != {"Sonarr", "Radarr"}
+        or any(value is not None and type(value) is not str for value in application_sync.values())
+    ):
+        raise LabError("doctor observation contract is invalid")
+    path_mapping = observation["path_mapping"]
+    if path_mapping is not None and (
+        type(path_mapping) is not dict
+        or any(type(key) is not str for key in path_mapping)
+        or set(path_mapping) != {"host", "remotePath", "localPath"}
+        or any(type(value) is not str for value in path_mapping.values())
+    ):
+        raise LabError("doctor observation contract is invalid")
+    if type(hardlink_status) is not str or hardlink_status not in {
+        "verified",
+        "impossible",
+        "ambiguous",
+        "unavailable",
+    }:
+        raise LabError("doctor hardlink status is invalid")
+
+    def equality_status(actual: object, expected: object) -> str:
+        if actual is None or actual == []:
+            return "missing"
+        return "verified" if actual == expected else "mismatch"
+
+    return {
+        "application.prowlarr-to-radarr": equality_status(
+            application_sync["Radarr"], "addOnly"
+        ),
+        "application.prowlarr-to-sonarr": equality_status(
+            application_sync["Sonarr"], "addOnly"
+        ),
+        "category.arr-to-qbittorrent": equality_status(
+            category_path, "/data/downloads/arr-lab"
+        ),
+        "container-path.shared-data": (
+            "mismatch"
+            if path_mapping is not None
+            else "verified"
+            if shared_mounts_verified
+            else "unavailable"
+        ),
+        "hardlink.downloads-to-media": hardlink_status,
+        "root-folder.radarr": equality_status(
+            root_paths["radarr"], ["/data/media/movies"]
+        ),
+        "root-folder.sonarr": equality_status(root_paths["sonarr"], ["/data/media/tv"]),
+    }
+
+
 def test_doctor() -> int:
     from arr_orchestrator.doctor import DoctorEngine, EvidenceCheck
     from arr_orchestrator.inventory import ServiceInventory, StackInventory
@@ -2426,24 +2571,53 @@ def test_doctor() -> int:
             raise LabError("doctor stack state is invalid")
         return StackInventory(tuple(rows), state)
 
-    def diagnose(payload: object, overrides: dict[str, str] | None = None) -> dict[str, object]:
-        statuses = {check_id: "verified" for check_id in check_ids}
-        statuses.update(overrides or {})
+    def diagnose(payload: object, statuses: dict[str, str]) -> dict[str, object]:
+        if type(statuses) is not dict or set(statuses) != set(check_ids):
+            raise LabError("doctor check status contract is invalid")
         checks = tuple(
-            EvidenceCheck(check_id, statuses[check_id], (f"lab.{check_id}",))
+            EvidenceCheck(check_id, statuses[check_id])
             for check_id in check_ids
         )
         return DoctorEngine().diagnose(inventory_from_payload(payload), checks).to_dict()
 
     def require_code(report: dict[str, object], code: str) -> None:
         findings = report.get("findings")
-        if not isinstance(findings, list) or code not in {
+        observed = {
             item.get("code") for item in findings if isinstance(item, dict)
-        }:
-            raise LabError(f"doctor scenario did not report {code}")
+        } if isinstance(findings, list) else set()
+        if observed != {code}:
+            raise LabError(
+                "doctor scenario finding set mismatch: "
+                + json.dumps(sorted(item for item in observed if isinstance(item, str)), separators=(",", ":"))
+            )
+
+    def controller_observation(
+        completed_run: subprocess.CompletedProcess[str], expected_scenario: str
+    ) -> dict[str, object]:
+        payload = last_json_object(completed_run.stdout)
+        public_keys = {
+            "schema",
+            "scenario",
+            "category_path",
+            "root_paths",
+            "application_sync",
+            "path_mapping",
+        }
+        if (
+            completed_run.returncode != 0
+            or type(payload) is not dict
+            or any(type(key) is not str for key in payload)
+            or set(payload) != public_keys | {"ok"}
+            or payload.get("ok") is not True
+            or payload.get("scenario") != expected_scenario
+        ):
+            raise LabError(f"doctor controller scenario failed: {expected_scenario}")
+        return {key: payload[key] for key in sorted(public_keys)}
 
     try:
         _layout, bundle, mock_path, mock_value = prepare_bootstrap_runtime(root)
+        fault_value = secrets.token_urlsafe(32)
+        fault_path = write_secret(root, "fault-api-token", value=fault_value)
         session_root = root / "session"
         session_root.mkdir(mode=0o755)
         assign_owner(session_root, 65532, 65532, directory_mode=0o755)
@@ -2502,12 +2676,13 @@ print(json.dumps(redacted_result(states,baselines),sort_keys=True,separators=(',
             "prowlarr-api-key": write_secret(root, "doctor-prowlarr-api-key", value=bundle.value("prowlarr", "api_key")),
             "qbittorrent-bearer": write_secret(root, "doctor-qbittorrent-bearer", value=bundle.value("qbittorrent", "api_key")),
             "jellyfin-access": access_path,
+            "fault-api-token": fault_path,
         }
         inventory_mounts: list[str] = []
         for name, path in sorted(raw_secrets.items()):
             inventory_mounts.extend(("--volume", f"{path}:/run/secrets/{name}:ro"))
         inventory_probe = r'''
-import json
+import json,os
 from pathlib import Path
 from arr_orchestrator.adapters.jellyfin import JellyfinAdapter
 from arr_orchestrator.adapters.prowlarr import ProwlarrAdapter
@@ -2524,21 +2699,32 @@ def http(service,url,secret,header):
     endpoint=ServiceEndpoint(service,url,'file:'+secret)
     return ReadOnlyHttpTransport(endpoint,resolver,policy=policy,credential_header=header,credential_prefix='')
 qbit_endpoint=ServiceEndpoint('qbittorrent','http://qbittorrent:8080','file:qbittorrent-bearer')
+prowlarr_url=os.environ.get('DOCTOR_PROWLARR_URL','http://prowlarr:9696')
+prowlarr_secret=os.environ.get('DOCTOR_PROWLARR_SECRET','prowlarr-api-key')
 readers={
     'sonarr':SonarrAdapter(http('sonarr','http://sonarr:8989','sonarr-api-key','X-Api-Key')),
     'radarr':RadarrAdapter(http('radarr','http://radarr:7878','radarr-api-key','X-Api-Key')),
-    'prowlarr':ProwlarrAdapter(http('prowlarr','http://prowlarr:9696','prowlarr-api-key','X-Api-Key')),
+    'prowlarr':ProwlarrAdapter(http('prowlarr',prowlarr_url,prowlarr_secret,'X-Api-Key')),
     'qbittorrent':QbittorrentAdapter(QbittorrentReadOnlyTransport(qbit_endpoint,resolver.resolve('file:qbittorrent-bearer'),policy=policy,opener=_default_opener(True))),
     'jellyfin':JellyfinAdapter(http('jellyfin','http://jellyfin:8096','jellyfin-access','X-Emby-Token')),
 }
 print(json.dumps({'schema':'arr-orchestrator.lab-doctor-inventory.v1','inventory':StackInventoryBuilder(readers).read().to_dict()},sort_keys=True,separators=(',',':')))
 '''
 
-        def read_inventory() -> dict[str, object]:
+        def read_inventory(*, fault_prowlarr: bool = False) -> dict[str, object]:
+            probe_env = (
+                (
+                    "--env", "DOCTOR_PROWLARR_URL=http://fault-api:8080",
+                    "--env", "DOCTOR_PROWLARR_SECRET=fault-api-token",
+                )
+                if fault_prowlarr
+                else ()
+            )
             controller = run(
                 compose_command(
                     "--profile", "isolation", "run", "--rm", "--build", "--no-deps",
-                    *inventory_mounts, "--entrypoint", "python3", "lab-controller", "-c", inventory_probe,
+                    *inventory_mounts, *probe_env,
+                    "--entrypoint", "python3", "lab-controller", "-c", inventory_probe,
                 ),
                 env=env,
                 check=False,
@@ -2552,7 +2738,16 @@ print(json.dumps({'schema':'arr-orchestrator.lab-doctor-inventory.v1','inventory
             return payload
 
         healthy_inventory = read_inventory()
-        baseline_report = diagnose(healthy_inventory)
+        healthy_scenario = run(controller_scenario_command(bundle, "healthy"), env=env, check=False)
+        controller_runs.append(healthy_scenario)
+        healthy_observation = controller_observation(healthy_scenario, "healthy")
+        converge_radarr_hardlink_topology(project, lab_id, root, env, cross_device=False)
+        healthy_statuses = doctor_statuses_from_observation(
+            healthy_observation,
+            shared_mounts_verified=inspection.get("shared_data_mount_verified") is True,
+            hardlink_status="verified",
+        )
+        baseline_report = diagnose(healthy_inventory, healthy_statuses)
         if baseline_report.get("state") != "healthy":
             findings = baseline_report.get("findings")
             safe_codes = sorted(
@@ -2574,26 +2769,36 @@ print(json.dumps({'schema':'arr-orchestrator.lab-doctor-inventory.v1','inventory
             "path-mapping-mismatch": ("container-path.shared-data", "CONTAINER_PATH_MISMATCH"),
         }
         proven: dict[str, str] = {}
-        for name, (check_id, expected_code) in scenario_codes.items():
+        for name, (_check_id, expected_code) in scenario_codes.items():
             fault = run(controller_scenario_command(bundle, name), env=env, check=False)
             controller_runs.append(fault)
-            fault_payload = last_json_object(fault.stdout)
-            if (
-                fault.returncode != 0
-                or fault_payload.get("ok") is not True
-                or fault_payload.get("scenario") != name
-            ):
-                raise LabError(f"doctor controller scenario failed: {name}")
-            report = diagnose(healthy_inventory, {check_id: "mismatch"})
+            fault_observation = controller_observation(fault, name)
+            fault_statuses = doctor_statuses_from_observation(
+                fault_observation,
+                shared_mounts_verified=inspection.get("shared_data_mount_verified") is True,
+                hardlink_status="verified",
+            )
+            report = diagnose(healthy_inventory, fault_statuses)
             require_code(report, expected_code)
             proven[name] = expected_code
             restore = run(controller_scenario_command(bundle, "healthy"), env=env, check=False)
             controller_runs.append(restore)
-            if restore.returncode != 0 or last_json_object(restore.stdout).get("scenario") != "healthy":
+            restored_observation = controller_observation(restore, "healthy")
+            restored_statuses = doctor_statuses_from_observation(
+                restored_observation,
+                shared_mounts_verified=inspection.get("shared_data_mount_verified") is True,
+                hardlink_status="verified",
+            )
+            if diagnose(healthy_inventory, restored_statuses).get("state") != "healthy":
                 raise LabError(f"doctor controller scenario restore failed: {name}")
 
         converge_radarr_hardlink_topology(project, lab_id, root, env, cross_device=True)
-        hardlink_report = diagnose(healthy_inventory, {"hardlink.downloads-to-media": "impossible"})
+        hardlink_statuses = doctor_statuses_from_observation(
+            healthy_observation,
+            shared_mounts_verified=inspection.get("shared_data_mount_verified") is True,
+            hardlink_status="impossible",
+        )
+        hardlink_report = diagnose(healthy_inventory, hardlink_statuses)
         require_code(hardlink_report, "HARDLINK_IMPOSSIBLE")
         proven["hardlink-cross-device"] = "HARDLINK_IMPOSSIBLE"
         converge_radarr_hardlink_topology(project, lab_id, root, env, cross_device=False)
@@ -2604,7 +2809,7 @@ print(json.dumps({'schema':'arr-orchestrator.lab-doctor-inventory.v1','inventory
             project, lab_id, root, {"prowlarr"}, [*unavailable_prefix, "stop", "prowlarr"], env,
         )
         unavailable_inventory = read_inventory()
-        unavailable_report = diagnose(unavailable_inventory)
+        unavailable_report = diagnose(unavailable_inventory, healthy_statuses)
         require_code(unavailable_report, "SERVICE_UNREACHABLE")
         proven["service-unavailable"] = "SERVICE_UNREACHABLE"
         run_authorized_compose_mutation(
@@ -2614,24 +2819,91 @@ print(json.dumps({'schema':'arr-orchestrator.lab-doctor-inventory.v1','inventory
 
         scenario_path = apply_runner_config(root, "unsupported-api-version")
         runner_fault = json.loads(scenario_path.read_text(encoding="utf-8"))
-        runner_code_map = {"unsupported_api_version": "API_VERSION_UNSUPPORTED"}
-        expected_runner_code = runner_code_map.get(runner_fault.get("expected_finding"))
-        if expected_runner_code is None:
+        expected_fault = {
+            "service": "prowlarr",
+            "request_path": "/api/v1/system/status",
+            "fault_api_scenario": "unsupported-version",
+        }
+        if (
+            runner_fault.get("fault") != expected_fault
+            or runner_fault.get("expected_finding") != "API_VERSION_UNSUPPORTED"
+        ):
             raise LabError("doctor unsupported API scenario contract drifted")
-        rows = list(inventory_from_payload(healthy_inventory).services)
-        prowlarr = rows[2]
-        rows[2] = ServiceInventory(
-            prowlarr.service,
-            "unsupported",
-            failure_code="UNSUPPORTED_API_VERSION",
+        run(
+            compose_command(
+                "--profile", "doubles", "up", "-d", "--build", "--wait", "fault-api"
+            ),
+            env=env,
         )
-        unsupported = StackInventory(tuple(rows), "partial").to_dict()
-        unsupported_report = diagnose(unsupported)
-        require_code(unsupported_report, expected_runner_code)
-        proven["unsupported-api-version"] = expected_runner_code
+        fault_id = scenario_service_container(project, "fault-api")
+        verify_double_container(project, fault_id, "fault-api-token")
+        configure_fault = r'''
+import json,os,urllib.request
+scenario=os.environ['DOCTOR_FAULT_SCENARIO']
+credential=open('/run/secrets/fault-api-token',encoding='utf-8').read().strip()
+body=json.dumps({'scenario':scenario},separators=(',',':')).encode()
+request=urllib.request.Request(
+    'http://127.0.0.1:8080/scenario',data=body,method='PUT',
+    headers={'Authorization':'Bearer '+credential,'Content-Type':'application/json'},
+)
+with urllib.request.urlopen(request,timeout=3) as response:
+    print(response.read().decode())
+'''
+
+        def set_fault_api_scenario(name: str) -> None:
+            configure_run = run(
+                [
+                    "docker", "exec", "--env", f"DOCTOR_FAULT_SCENARIO={name}",
+                    fault_id, "python3", "-c", configure_fault,
+                ],
+                check=False,
+            )
+            controller_runs.append(configure_run)
+            configured = last_json_object(configure_run.stdout)
+            if configure_run.returncode != 0 or configured != {"scenario": name}:
+                raise LabError("doctor fault API scenario readback failed")
+
+        set_fault_api_scenario("unsupported-version")
+
+        unsupported_inventory = read_inventory(fault_prowlarr=True)
+        unsupported_services = {
+            item.get("service"): item
+            for item in unsupported_inventory.get("services", [])
+            if isinstance(item, dict)
+        }
+        if (
+            unsupported_inventory.get("state") != "partial"
+            or unsupported_services.get("prowlarr", {}).get("state") != "unsupported"
+            or unsupported_services.get("prowlarr", {}).get("failure_code")
+            != "UNSUPPORTED_API_VERSION"
+        ):
+            raise LabError("doctor unsupported API adapter readback failed")
+        unsupported_report = diagnose(unsupported_inventory, healthy_statuses)
+        require_code(unsupported_report, "API_VERSION_UNSUPPORTED")
+        proven["unsupported-api-version"] = "API_VERSION_UNSUPPORTED"
+        set_fault_api_scenario("healthy")
         apply_runner_config(root, "healthy")
 
-        assert_no_secret_exposure(project, controller_runs, credential_variants(bundle, mock_value), env)
+        final_inventory = read_inventory()
+        final_scenario = run(controller_scenario_command(bundle, "healthy"), env=env, check=False)
+        controller_runs.append(final_scenario)
+        final_observation = controller_observation(final_scenario, "healthy")
+        converge_radarr_hardlink_topology(project, lab_id, root, env, cross_device=False)
+        final_statuses = doctor_statuses_from_observation(
+            final_observation,
+            shared_mounts_verified=inspection.get("shared_data_mount_verified") is True,
+            hardlink_status="verified",
+        )
+        final_report = diagnose(final_inventory, final_statuses)
+        if final_report.get("state") != "healthy" or final_report.get("findings") != []:
+            raise LabError("doctor final restoration did not return to measured healthy")
+
+        assert_no_secret_exposure(
+            project,
+            controller_runs,
+            credential_variants(bundle, mock_value, {"fault-api.token": fault_value}),
+            env,
+        )
         result = {
             "schema": "arr-orchestrator.lab-doctor-run.v1",
             "lab_id": lab_id,
@@ -2640,6 +2912,7 @@ print(json.dumps({'schema':'arr-orchestrator.lab-doctor-inventory.v1','inventory
             "proven_findings": dict(sorted(proven.items())),
             "published_ports": 0,
             "runtime_matrix_verified": inspection["runtime_matrix_verified"],
+            "shared_data_mount_verified": inspection["shared_data_mount_verified"],
         }
         completed = True
     finally:

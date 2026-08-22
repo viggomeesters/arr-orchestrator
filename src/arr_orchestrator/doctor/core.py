@@ -8,7 +8,7 @@ from typing import Iterable
 from ..inventory import REQUIRED_SERVICES, ServiceInventory, StackInventory
 
 _SCHEMA = "arr-orchestrator.doctor-report.v1"
-_REF = re.compile(r"^[a-z][a-z0-9_.:-]{0,127}$")
+_VERSION = re.compile(r"^v?[0-9][0-9A-Za-z]*(?:[._+-][0-9A-Za-z]+)*$")
 
 _CHECK_SPECS = {
     "category.arr-to-qbittorrent": ("qbittorrent", {"verified", "missing", "mismatch", "ambiguous", "unavailable"}),
@@ -18,6 +18,64 @@ _CHECK_SPECS = {
     "root-folder.radarr": ("radarr", {"verified", "missing", "mismatch", "ambiguous", "unavailable"}),
     "container-path.shared-data": ("storage", {"verified", "mismatch", "ambiguous", "unavailable"}),
     "hardlink.downloads-to-media": ("storage", {"verified", "impossible", "ambiguous", "unavailable"}),
+}
+
+_CHECK_REFS = {check_id: (f"doctor.{check_id}",) for check_id in _CHECK_SPECS}
+_SAFE_OWNERS = {"sonarr", "radarr", "prowlarr", "qbittorrent", "jellyfin", "storage"}
+_SERVICE_RESOURCES = {
+    "sonarr": frozenset({"system_status", "root_folders", "download_clients", "quality_profiles", "queue_summary"}),
+    "radarr": frozenset({"system_status", "root_folders", "download_clients", "quality_profiles", "queue_summary"}),
+    "prowlarr": frozenset({"applications", "indexers", "system_status"}),
+    "qbittorrent": frozenset({"categories", "queue"}),
+    "jellyfin": frozenset({"health", "libraries", "refresh_status"}),
+}
+_FAILURE_CODES = {
+    "unreachable": frozenset({"SERVICE_UNREACHABLE", "DEADLINE_EXCEEDED", "TLS_VERIFICATION_FAILED"}),
+    "unsupported": frozenset({"UNSUPPORTED_API_VERSION", "UNSUPPORTED_CAPABILITY"}),
+    "unknown": frozenset({
+        "ADAPTER_NOT_CONFIGURED",
+        "AUTH_FAILED",
+        "CONTENT_TYPE_INVALID",
+        "CREDENTIAL_INVALID",
+        "FIELD_PROJECTION_REQUIRED",
+        "HTTP_STATUS_INVALID",
+        "INVENTORY_PROJECTION_FAILED",
+        "INVENTORY_READ_FAILED",
+        "JSON_INVALID",
+        "MUTATION_DISABLED",
+        "ORIGIN_DENIED",
+        "PATH_INVALID",
+        "PRIVATE_DATA_REDACTED",
+        "QUEUE_BOUNDS_INVALID",
+        "QUEUE_PAGINATION_INVALID",
+        "REDIRECT_DENIED",
+        "RESOURCE_NOT_FOUND",
+        "RESPONSE_BOUNDS_INVALID",
+        "RESPONSE_INVALID",
+        "RESPONSE_SHAPE_INVALID",
+        "RESPONSE_TOO_LARGE",
+        "SERVICE_IDENTITY_INVALID",
+        "TEXT_INVALID",
+    }),
+}
+_SAFE_EVIDENCE_REFS = {
+    *(reference for references in _CHECK_REFS.values() for reference in references),
+    *(
+        f"inventory.{service}.{suffix}"
+        for service in REQUIRED_SERVICES
+        for suffix in (
+            "state",
+            "api-version",
+            "capabilities",
+            "evidence",
+            "root-folders",
+            "download-clients",
+            "quality-profiles",
+            "applications",
+            "categories",
+            "health",
+        )
+    ),
 }
 
 _FINDING_TEXT = {
@@ -136,25 +194,25 @@ _FINDING_TEXT = {
 class EvidenceCheck:
     check_id: str
     status: str
-    evidence_refs: tuple[str, ...]
 
     def __post_init__(self) -> None:
-        if type(self.check_id) is not str:
-            raise ValueError("INVALID_CHECK_ID")
-        if type(self.status) is not str:
-            raise ValueError("INVALID_CHECK_STATUS")
-        spec = _CHECK_SPECS.get(self.check_id)
-        if spec is None:
-            raise ValueError("UNKNOWN_CHECK")
-        if self.status not in spec[1]:
-            raise ValueError("INVALID_CHECK_STATUS")
-        if (
-            type(self.evidence_refs) is not tuple
-            or not self.evidence_refs
-            or len(self.evidence_refs) > 8
-            or any(type(item) is not str or _REF.fullmatch(item) is None for item in self.evidence_refs)
-        ):
-            raise ValueError("INVALID_EVIDENCE_REF")
+        _validate_check(self)
+
+
+def _validate_check(check: EvidenceCheck) -> None:
+    if type(check) is not EvidenceCheck:
+        raise ValueError("INVALID_CHECK")
+    check_id = check.check_id
+    status = check.status
+    if type(check_id) is not str:
+        raise ValueError("INVALID_CHECK_ID")
+    if type(status) is not str:
+        raise ValueError("INVALID_CHECK_STATUS")
+    spec = _CHECK_SPECS.get(check_id)
+    if spec is None:
+        raise ValueError("UNKNOWN_CHECK")
+    if status not in spec[1]:
+        raise ValueError("INVALID_CHECK_STATUS")
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,7 +224,11 @@ class Finding:
     explanation: str
     remediation: str
 
+    def __post_init__(self) -> None:
+        _validate_finding(self)
+
     def to_dict(self) -> dict[str, object]:
+        _validate_finding(self)
         return {
             "code": self.code,
             "severity": self.severity,
@@ -183,7 +245,11 @@ class DoctorReport:
     findings: tuple[Finding, ...]
     schema: str = _SCHEMA
 
+    def __post_init__(self) -> None:
+        _validate_report(self)
+
     def to_dict(self) -> dict[str, object]:
+        _validate_report(self)
         return {
             "schema": self.schema,
             "state": self.state,
@@ -198,6 +264,101 @@ class DoctorReport:
         return json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":"))
 
 
+def _validate_finding(finding: Finding) -> None:
+    if type(finding) is not Finding:
+        raise ValueError("INVALID_FINDING")
+    if any(
+        type(value) is not str
+        for value in (
+            finding.code,
+            finding.severity,
+            finding.owner,
+            finding.explanation,
+            finding.remediation,
+        )
+    ):
+        raise ValueError("INVALID_FINDING")
+    text = _FINDING_TEXT.get(finding.code)
+    if (
+        text is None
+        or finding.severity != "blocker"
+        or finding.owner not in _SAFE_OWNERS
+        or (finding.explanation, finding.remediation) != text
+        or type(finding.evidence_refs) is not tuple
+        or not finding.evidence_refs
+        or any(
+            type(item) is not str or item not in _SAFE_EVIDENCE_REFS
+            for item in finding.evidence_refs
+        )
+        or tuple(sorted(set(finding.evidence_refs))) != finding.evidence_refs
+        or not _finding_shape_is_registered(finding)
+    ):
+        raise ValueError("INVALID_FINDING")
+
+
+def _finding_shape_is_registered(finding: Finding) -> bool:
+    for check_id, (owner, statuses) in _CHECK_SPECS.items():
+        if (
+            finding.owner == owner
+            and finding.evidence_refs == _CHECK_REFS[check_id]
+            and finding.code
+            in {_check_code(check_id, status) for status in statuses if status != "verified"}
+        ):
+            return True
+
+    service_shapes = {
+        "SERVICE_UNREACHABLE": "state",
+        "SERVICE_STATE_UNKNOWN": "state",
+        "API_VERSION_UNSUPPORTED": "api-version",
+        "SERVICE_CAPABILITY_PARTIAL": "capabilities",
+        "SERVICE_EVIDENCE_UNAVAILABLE": "evidence",
+    }
+    suffix = service_shapes.get(finding.code)
+    if suffix is not None:
+        return finding.evidence_refs == _service_ref(finding.owner, suffix)
+    exact_service_shapes = {
+        "ROOT_FOLDER_MISSING": ({"sonarr", "radarr"}, "root-folders"),
+        "ROOT_FOLDER_INACCESSIBLE": ({"sonarr", "radarr"}, "root-folders"),
+        "DOWNLOAD_CLIENT_MISSING": ({"sonarr", "radarr"}, "download-clients"),
+        "QUALITY_PROFILE_MISSING": ({"sonarr", "radarr"}, "quality-profiles"),
+        "APPLICATION_LINK_MISSING": ({"prowlarr"}, "applications"),
+        "CATEGORY_MISSING": ({"qbittorrent"}, "categories"),
+        "MEDIA_SERVER_UNHEALTHY": ({"jellyfin"}, "health"),
+    }
+    shape = exact_service_shapes.get(finding.code)
+    return bool(
+        shape
+        and finding.owner in shape[0]
+        and finding.evidence_refs == _service_ref(finding.owner, shape[1])
+    )
+
+
+def _validate_report(report: DoctorReport) -> None:
+    if (
+        type(report) is not DoctorReport
+        or type(report.schema) is not str
+        or report.schema != _SCHEMA
+        or type(report.state) is not str
+        or report.state not in {"healthy", "degraded", "blocked"}
+        or type(report.findings) is not tuple
+    ):
+        raise ValueError("INVALID_REPORT")
+    for finding in report.findings:
+        _validate_finding(finding)
+    ordered = tuple(sorted(report.findings, key=lambda item: (item.code, item.owner, item.evidence_refs)))
+    if report.findings != ordered:
+        raise ValueError("INVALID_REPORT")
+    expected_state = (
+        "blocked"
+        if any(item.severity == "blocker" for item in report.findings)
+        else "degraded"
+        if report.findings
+        else "healthy"
+    )
+    if report.state != expected_state:
+        raise ValueError("INVALID_REPORT")
+
+
 def _finding(code: str, owner: str, evidence_refs: tuple[str, ...], severity: str = "blocker") -> Finding:
     explanation, remediation = _FINDING_TEXT[code]
     return Finding(code, severity, owner, evidence_refs, explanation, remediation)
@@ -208,7 +369,126 @@ def _service_ref(service: str, suffix: str = "state") -> tuple[str, ...]:
 
 
 def _evidence_map(service: ServiceInventory) -> dict[str, object]:
-    return {key: value for key, value in service.evidence if type(key) is str}
+    result: dict[str, object] = {}
+    for key, value in service.evidence:
+        if key in result:
+            raise ValueError("INVALID_SERVICE_EVIDENCE")
+        result[key] = value
+    return result
+
+
+def _validate_service_state_payload(service: ServiceInventory) -> None:
+    if (
+        type(service.version) not in {str, type(None)}
+        or type(service.api_version) not in {int, type(None)}
+        or type(service.api_version) is bool
+        or type(service.resources) is not tuple
+        or type(service.unsupported_resources) is not tuple
+        or any(type(item) is not str for item in service.resources)
+        or any(type(item) is not str for item in service.unsupported_resources)
+        or len(set(service.resources)) != len(service.resources)
+        or len(set(service.unsupported_resources)) != len(service.unsupported_resources)
+        or bool(set(service.resources) & set(service.unsupported_resources))
+        or not set(service.resources).issubset(_SERVICE_RESOURCES[service.service])
+        or not set(service.unsupported_resources).issubset(_SERVICE_RESOURCES[service.service])
+        or type(service.failure_code) not in {str, type(None)}
+        or type(service.retryable) is not bool
+    ):
+        raise ValueError("INCONSISTENT_SERVICE_STATE")
+    if service.state in {"available", "partial"} and (
+        type(service.version) is not str
+        or _VERSION.fullmatch(service.version) is None
+        or (
+            service.service in {"sonarr", "radarr", "prowlarr"}
+            and (type(service.api_version) is not int or service.api_version < 1)
+        )
+        or (
+            service.service in {"qbittorrent", "jellyfin"}
+            and service.api_version is not None
+        )
+    ):
+        raise ValueError("INCONSISTENT_SERVICE_STATE")
+    if service.state == "available":
+        valid = (
+            not service.unsupported_resources
+            and service.failure_code is None
+            and service.retryable is False
+        )
+    elif service.state == "partial":
+        valid = (
+            bool(service.unsupported_resources)
+            and service.failure_code is None
+            and service.retryable is False
+        )
+    else:
+        valid = (
+            service.version is None
+            and service.api_version is None
+            and not service.resources
+            and not service.unsupported_resources
+            and not service.evidence
+            and service.failure_code in _FAILURE_CODES[service.state]
+            and (service.state == "unreachable" or service.retryable is False)
+        )
+    if not valid:
+        raise ValueError("INCONSISTENT_SERVICE_STATE")
+
+
+def _validate_service_evidence(service: ServiceInventory) -> None:
+    evidence = _evidence_map(service)
+    if service.service in {"sonarr", "radarr"}:
+        keys = (
+            "root_folder_count",
+            "inaccessible_root_folder_count",
+            "download_client_count",
+            "enabled_download_client_count",
+            "quality_profile_count",
+        )
+        values = {key: evidence.get(key) for key in keys}
+        if any(value is not None and (type(value) is not int or value < 0) for value in values.values()):
+            raise ValueError("INVALID_SERVICE_EVIDENCE")
+        if (
+            type(values["root_folder_count"]) is int
+            and type(values["inaccessible_root_folder_count"]) is int
+            and values["inaccessible_root_folder_count"] > values["root_folder_count"]
+        ):
+            raise ValueError("INVALID_SERVICE_EVIDENCE")
+        if (
+            type(values["download_client_count"]) is int
+            and type(values["enabled_download_client_count"]) is int
+            and values["enabled_download_client_count"] > values["download_client_count"]
+        ):
+            raise ValueError("INVALID_SERVICE_EVIDENCE")
+    elif service.service == "prowlarr":
+        for key in (
+            "application_count",
+            "indexer_total",
+            "indexer_enabled",
+            "indexer_rss_capable",
+            "indexer_search_capable",
+        ):
+            value = evidence.get(key)
+            if value is not None and (type(value) is not int or value < 0):
+                raise ValueError("INVALID_SERVICE_EVIDENCE")
+        total = evidence.get("indexer_total")
+        if type(total) is int and any(
+            type(evidence.get(key)) is int and evidence[key] > total
+            for key in ("indexer_enabled", "indexer_rss_capable", "indexer_search_capable")
+        ):
+            raise ValueError("INVALID_SERVICE_EVIDENCE")
+
+
+def _stack_state(services: tuple[ServiceInventory, ...]) -> str:
+    states = {service.state for service in services}
+    if states == {"available"}:
+        return "healthy"
+    if states == {"unknown"}:
+        return "unknown"
+    if states == {"unreachable"}:
+        return "unreachable"
+    if states == {"unsupported"}:
+        return "unsupported"
+    return "partial"
 
 
 def _service_findings(service: ServiceInventory) -> Iterable[Finding]:
@@ -306,12 +586,15 @@ class DoctorEngine:
                 for item in service.evidence
             ):
                 raise ValueError("INVALID_SERVICE_EVIDENCE")
+            _validate_service_state_payload(service)
+            _validate_service_evidence(service)
         if len(inventory.services) != len(REQUIRED_SERVICES):
             raise ValueError("INVALID_INVENTORY_SERVICES")
+        if inventory.state != _stack_state(inventory.services):
+            raise ValueError("INCONSISTENT_INVENTORY_STATE")
         supplied: dict[str, EvidenceCheck] = {}
         for check in checks:
-            if type(check) is not EvidenceCheck:
-                raise ValueError("INVALID_CHECK")
+            _validate_check(check)
             if check.check_id in supplied:
                 raise ValueError("DUPLICATE_CHECK")
             supplied[check.check_id] = check
@@ -330,7 +613,7 @@ class DoctorEngine:
                     )
                 )
             elif check.status != "verified":
-                findings.append(_finding(_check_code(check_id, check.status), owner, check.evidence_refs))
+                findings.append(_finding(_check_code(check_id, check.status), owner, _CHECK_REFS[check_id]))
 
         ordered = tuple(sorted(findings, key=lambda item: (item.code, item.owner, item.evidence_refs)))
         state = "blocked" if any(item.severity == "blocker" for item in ordered) else "degraded" if ordered else "healthy"

@@ -2,8 +2,9 @@
   "schema": "arr-orchestrator.lab-runner-fault.v1",
   "scenario": "unsupported-api-version",
   "fault": {
-    "advertised_api_version": "999.0",
-    "supported_api_versions": ["1.0"]
+    "service": "prowlarr",
+    "request_path": "/api/v1/system/status",
+    "fault_api_scenario": "unsupported-version"
   },
-  "expected_finding": "unsupported_api_version"
+  "expected_finding": "API_VERSION_UNSUPPORTED"
 }

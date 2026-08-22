@@ -29,7 +29,8 @@
             "01-define-core-contracts",
             "08-implement-stack-inventory",
             "09-implement-doctor-rules",
-            "08a-harden-inventory-exception-metadata"
+            "08a-harden-inventory-exception-metadata",
+            "09b-harden-doctor-truth-boundaries"
           ]
         },
         {

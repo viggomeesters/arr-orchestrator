@@ -3,12 +3,13 @@ from __future__ import annotations
 import json
 import sys
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 
-from arr_orchestrator.doctor import DoctorEngine, EvidenceCheck
+from arr_orchestrator.doctor import DoctorEngine, DoctorReport, EvidenceCheck, Finding
 from arr_orchestrator.inventory import REQUIRED_SERVICES, ServiceInventory, StackInventory
 
 
@@ -71,7 +72,7 @@ def checks(**overrides: str) -> tuple[EvidenceCheck, ...]:
     statuses = {check_id: "verified" for check_id in REQUIRED_CHECKS}
     statuses.update(overrides)
     return tuple(
-        EvidenceCheck(check_id, statuses[check_id], (f"doctor.{check_id}",))
+        EvidenceCheck(check_id, statuses[check_id])
         for check_id in sorted(statuses)
     )
 
@@ -83,7 +84,67 @@ class DoctorRuleTests(unittest.TestCase):
         self.assertEqual("healthy", report.state)
         self.assertEqual((), report.findings)
         self.assertEqual(report.to_json(), report.to_json())
+        self.assertEqual(report.to_json(), DoctorEngine().diagnose(healthy_inventory(), reversed(checks())).to_json())
         self.assertEqual(report.to_dict(), json.loads(report.to_json()))
+
+    def test_service_state_payload_combinations_fail_closed(self):
+        valid = healthy_inventory().services[0]
+        invalid_available = replace(
+            valid,
+            failure_code="SERVICE_UNREACHABLE",
+            retryable=True,
+        )
+        invalid_available_unsupported = replace(
+            valid,
+            unsupported_resources=("queue_summary",),
+        )
+        invalid_available_version = replace(valid, version=None)
+        invalid_available_empty_version = replace(valid, version="")
+        invalid_available_whitespace_version = replace(valid, version="   ")
+        invalid_available_api = replace(valid, api_version=None)
+        invalid_partial = replace(
+            valid,
+            state="partial",
+            unsupported_resources=(),
+        )
+        invalid_partial_overlap = replace(
+            valid,
+            state="partial",
+            unsupported_resources=("system_status",),
+        )
+        invalid_failure = replace(
+            valid,
+            state="unreachable",
+            failure_code="SERVICE_UNREACHABLE",
+        )
+        invalid_failure_code = replace(
+            valid,
+            state="unsupported",
+            version=None,
+            api_version=None,
+            resources=(),
+            evidence=(),
+            failure_code="AUTH_FAILED",
+        )
+        for name, row in (
+            ("available-failure", invalid_available),
+            ("available-unsupported", invalid_available_unsupported),
+            ("available-version", invalid_available_version),
+            ("available-empty-version", invalid_available_empty_version),
+            ("available-whitespace-version", invalid_available_whitespace_version),
+            ("available-api-version", invalid_available_api),
+            ("partial-without-unsupported", invalid_partial),
+            ("partial-resource-overlap", invalid_partial_overlap),
+            ("failure-with-snapshot", invalid_failure),
+            ("failure-code-mismatch", invalid_failure_code),
+        ):
+            with self.subTest(case=name):
+                services = list(healthy_inventory().services)
+                services[0] = row
+                stack_state = "healthy" if row.state == "available" else "partial"
+                inventory = StackInventory(tuple(services), stack_state)
+                with self.assertRaisesRegex(ValueError, "INCONSISTENT_SERVICE_STATE"):
+                    DoctorEngine().diagnose(inventory, checks())
 
     def test_every_finding_has_complete_privacy_safe_guidance(self):
         report = DoctorEngine().diagnose(
@@ -165,11 +226,11 @@ class DoctorRuleTests(unittest.TestCase):
             {finding.code for finding in report.findings},
         )
 
-    def test_unknown_check_ids_and_private_evidence_refs_are_rejected(self):
+    def test_unknown_check_ids_are_rejected_and_references_are_not_caller_controlled(self):
         with self.assertRaisesRegex(ValueError, "UNKNOWN_CHECK"):
-            EvidenceCheck("private.check", "verified", ("doctor.private",))
-        with self.assertRaisesRegex(ValueError, "INVALID_EVIDENCE_REF"):
-            EvidenceCheck("root-folder.sonarr", "verified", ("/private/path",))
+            EvidenceCheck("private.check", "verified")
+        with self.assertRaises(TypeError):
+            EvidenceCheck("root-folder.sonarr", "verified", ("secret.private-provider-canary",))
 
     def test_hostile_string_subclasses_are_rejected_before_hashing(self):
         class HostileString(str):
@@ -180,9 +241,92 @@ class DoctorRuleTests(unittest.TestCase):
                 raise RuntimeError("PRIVATE-EQUALITY")
 
         with self.assertRaisesRegex(ValueError, "INVALID_CHECK_ID"):
-            EvidenceCheck(HostileString("root-folder.sonarr"), "verified", ("doctor.root-folder.sonarr",))
+            EvidenceCheck(HostileString("root-folder.sonarr"), "verified")
         with self.assertRaisesRegex(ValueError, "INVALID_CHECK_STATUS"):
-            EvidenceCheck("root-folder.sonarr", HostileString("verified"), ("doctor.root-folder.sonarr",))
+            EvidenceCheck("root-folder.sonarr", HostileString("verified"))
+
+    def test_hostile_post_construction_check_mutation_is_revalidated_before_hashing(self):
+        class HostileString(str):
+            def __hash__(self):
+                raise RuntimeError("PRIVATE-HASH")
+
+            def __eq__(self, other):
+                raise RuntimeError("PRIVATE-EQUALITY")
+
+        item = EvidenceCheck("root-folder.sonarr", "verified")
+        object.__setattr__(item, "check_id", HostileString("root-folder.sonarr"))
+        with self.assertRaisesRegex(ValueError, "INVALID_CHECK_ID"):
+            DoctorEngine().diagnose(healthy_inventory(), (item, *checks()[1:]))
+
+    def test_stack_state_must_match_service_state_reduction(self):
+        for state in ("partial", "unreachable", "unsupported", "unknown"):
+            with self.subTest(state=state), self.assertRaisesRegex(
+                ValueError, "INCONSISTENT_INVENTORY_STATE"
+            ):
+                DoctorEngine().diagnose(StackInventory(healthy_inventory().services, state), checks())
+
+    def test_duplicate_or_contradictory_service_evidence_fails_closed(self):
+        inventory = healthy_inventory()
+        base = inventory.services[0]
+        invalid_evidence = (
+            ("root_folder_count", 1),
+            ("root_folder_count", 2),
+            ("inaccessible_root_folder_count", 0),
+            ("download_client_count", 1),
+            ("enabled_download_client_count", 2),
+            ("quality_profile_count", 1),
+        )
+        rows = (ServiceInventory(
+            base.service,
+            base.state,
+            version=base.version,
+            api_version=base.api_version,
+            resources=base.resources,
+            evidence=invalid_evidence,
+        ), *inventory.services[1:])
+        with self.assertRaisesRegex(ValueError, "INVALID_SERVICE_EVIDENCE"):
+            DoctorEngine().diagnose(StackInventory(rows, "healthy"), checks())
+
+        contradictory = tuple(
+            (key, 2 if key == "enabled_download_client_count" else value)
+            for key, value in base.evidence
+        )
+        rows = (ServiceInventory(
+            base.service,
+            base.state,
+            version=base.version,
+            api_version=base.api_version,
+            resources=base.resources,
+            evidence=contradictory,
+        ), *inventory.services[1:])
+        with self.assertRaisesRegex(ValueError, "INVALID_SERVICE_EVIDENCE"):
+            DoctorEngine().diagnose(StackInventory(rows, "healthy"), checks())
+
+    def test_public_report_models_reject_caller_controlled_text_and_schema(self):
+        with self.assertRaisesRegex(ValueError, "INVALID_FINDING"):
+            Finding(
+                "CATEGORY_MISMATCH",
+                "blocker",
+                "qbittorrent",
+                ("secret.private-provider-canary",),
+                "PRIVATE EXPLANATION",
+                "PRIVATE REMEDIATION",
+            )
+        with self.assertRaisesRegex(ValueError, "INVALID_REPORT"):
+            DoctorReport("healthy", (), "private.schema")
+
+        valid = DoctorEngine().diagnose(
+            healthy_inventory(), checks(**{"category.arr-to-qbittorrent": "mismatch"})
+        ).findings[0]
+        with self.assertRaisesRegex(ValueError, "INVALID_FINDING"):
+            Finding(
+                valid.code,
+                valid.severity,
+                "jellyfin",
+                valid.evidence_refs,
+                valid.explanation,
+                valid.remediation,
+            )
 
     def test_subclassed_models_and_invalid_inventory_state_are_rejected(self):
         class InventorySubclass(StackInventory):
@@ -196,7 +340,7 @@ class DoctorRuleTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "INVALID_INVENTORY"):
             engine.diagnose(InventorySubclass(healthy_inventory().services, "healthy"), valid_checks)
         with self.assertRaisesRegex(ValueError, "INVALID_CHECK"):
-            engine.diagnose(healthy_inventory(), (CheckSubclass(valid_checks[0].check_id, "verified", valid_checks[0].evidence_refs), *valid_checks[1:]))
+            engine.diagnose(healthy_inventory(), (CheckSubclass(valid_checks[0].check_id, "verified"), *valid_checks[1:]))
         with self.assertRaisesRegex(ValueError, "INVALID_INVENTORY_STATE"):
             engine.diagnose(StackInventory(healthy_inventory().services, "private-state"), valid_checks)
 

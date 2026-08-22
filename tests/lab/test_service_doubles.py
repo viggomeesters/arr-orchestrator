@@ -159,6 +159,17 @@ class ServiceDoubleContractTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             state.set("unknown")
 
+    def test_fault_api_exposes_a_real_prowlarr_unsupported_version_boundary(self):
+        fault = load_module("fault_api_prowlarr", FAULT_SOURCE)
+        healthy = fault.prowlarr_status_response("healthy")
+        unsupported = fault.prowlarr_status_response("unsupported-version")
+        self.assertEqual(200, healthy[1])
+        self.assertIn(b'"appName":"Prowlarr"', healthy[3])
+        self.assertEqual(
+            (0.0, 404, "application/json", b'{"error":"unsupported_api_version"}'),
+            unsupported,
+        )
+
     def test_service_sources_do_not_log_request_material(self):
         for path in (MOCK_SOURCE, FAULT_SOURCE):
             source = path.read_text(encoding="utf-8")

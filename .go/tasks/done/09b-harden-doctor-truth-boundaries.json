@@ -1,0 +1,106 @@
+{
+  "schema": "go-workflow.repo-local.task.v1",
+  "kind": "task",
+  "execution_mode": "agent",
+  "shareable_delivery": "none",
+  "id": "09b-harden-doctor-truth-boundaries",
+  "project": "arr-orchestrator",
+  "status": "done",
+  "summary": "Harden doctor truth and privacy boundaries",
+  "description": "Repair late exact-byte Verdict C findings from task 09: fail closed on contradictory stack and service evidence, eliminate caller-controlled evidence references and report text, revalidate hostile post-construction mutations, derive live cross-service findings from observed scenario readback, and prove unsupported API through the real transport and Prowlarr adapter path.",
+  "scope": {
+    "read": [
+      "src/arr_orchestrator/inventory/**",
+      "src/arr_orchestrator/adapters/prowlarr.py",
+      "lab/compose.yaml",
+      "lab/scenarios/registry.json"
+    ],
+    "modify": [
+      "src/arr_orchestrator/doctor/**",
+      "tests/doctor/**",
+      "docs/doctor.md",
+      "scripts/lab.py",
+      "tests/integration/test_lab_doctor.py",
+      "lab/controller/scenarios.py",
+      "lab/services/fault-api/server.py",
+      "tests/lab/test_service_doubles.py",
+      "lab/scenarios/runner-config/unsupported-api-version.json",
+      "tests/lab/test_scenarios.py"
+    ]
+  },
+  "acceptance": [
+    "Stack state and normalized service evidence are internally consistent or diagnosis fails closed.",
+    "Evidence references, finding text, owners, severity, schema, and report state come only from closed trusted registries and reject hostile post-construction mutation.",
+    "Duplicate evidence keys and contradictory counts cannot produce a healthy report.",
+    "Live category, application-link, root-folder, and container-path findings are derived from exact controller readback, not hard-coded scenario names.",
+    "Unsupported API is proven through the private fault API, shared transport, Prowlarr adapter, inventory builder, and doctor rule."
+  ],
+  "verification": [
+    "python3 -m unittest discover -s tests/doctor -p \"test_*.py\"",
+    "python3 -m unittest tests.integration.test_lab_doctor tests.lab.test_service_doubles tests.lab.test_scenarios",
+    "python3 scripts/lab.py test doctor",
+    "bash scripts/check.sh"
+  ],
+  "claim": {
+    "agent": "hermes",
+    "claimed_at": "2026-08-22T08:54:47+02:00"
+  },
+  "work_status": "completed",
+  "review_status": "approved",
+  "review_history": [
+    {
+      "created_at": "2026-08-22T10:03:26+02:00",
+      "agent": "critic",
+      "status": "approved",
+      "evidence": "Verdict A; blockers none; exact pre-finish staged tree 5499fa3226edd6c00e92d00ce099953bc85fdf13; diff sha256 5001e1cc3b8df1d86636d4044d80105bfb4bf87e496d1b4dfea33d42e665a387; eight contradiction probes rejected; focused exact-index suites green; reviewer changed none",
+      "transaction_id": "5f95ae8a0c804561a10f5b2c16c88b03"
+    }
+  ],
+  "evidence": [
+    {
+      "schema": "go-workflow.finish-evidence.v1",
+      "created_at": "2026-08-22T10:03:12+02:00",
+      "task_id": "09b-harden-doctor-truth-boundaries",
+      "agent": "hermes",
+      "summary": "summary=hardened doctor truth and privacy boundaries after late Verdict C; changed_files=docs/doctor.md|lab/controller/scenarios.py|lab/scenarios/runner-config/unsupported-api-version.json|lab/services/fault-api/server.py|scripts/lab.py|src/arr_orchestrator/doctor/core.py|tests/doctor/test_doctor.py|tests/integration/test_lab_doctor.py|tests/lab/test_scenarios.py|tests/lab/test_service_doubles.py; verification_command=explicit 27-module unittest matrix plus bash scripts/check.sh plus ./go validate . plus python3 scripts/lab.py test doctor plus exact-index checkout; verification_result=passed 210/210 with 1 explicit live skip, live baseline healthy, exact 7 findings, shared mount identity true, published ports 0, Docker residue 0/0/0; critic=Verdict A blockers none on tree 5499fa3226edd6c00e92d00ce099953bc85fdf13 diff sha256 5001e1cc3b8df1d86636d4044d80105bfb4bf87e496d1b4dfea33d42e665a387; runtime=hermes; billing_mode=subscription; owner=hermes",
+      "changed_files": [
+        "docs/doctor.md",
+        "lab/controller/scenarios.py",
+        "lab/scenarios/runner-config/unsupported-api-version.json",
+        "lab/services/fault-api/server.py",
+        "scripts/lab.py",
+        "src/arr_orchestrator/doctor/core.py",
+        "tests/doctor/test_doctor.py",
+        "tests/integration/test_lab_doctor.py",
+        "tests/lab/test_scenarios.py",
+        "tests/lab/test_service_doubles.py"
+      ],
+      "no_diff": false,
+      "verification": {
+        "command": "explicit 27-module unittest matrix plus bash scripts/check.sh plus ./go validate . plus python3 scripts/lab.py test doctor plus exact-index checkout",
+        "result": "passed 210/210 with 1 explicit live skip, live baseline healthy, exact 7 findings, shared mount identity true, published ports 0, Docker residue 0/0/0"
+      },
+      "runtime": {
+        "agent": "hermes",
+        "runtime": "hermes",
+        "model": null,
+        "billing_mode": "subscription"
+      },
+      "usage": {
+        "schema": "go-workflow.usage-attribution.v1",
+        "runtime_kind": "hermes",
+        "billing_mode": "subscription",
+        "owner": "hermes",
+        "model": null,
+        "token_estimate": null,
+        "api_equivalent_cost_usd": null,
+        "provider_invoice_cost_usd": null,
+        "cost_label": "api_equivalent_not_invoice_cost"
+      },
+      "review": {
+        "outcome": "Verdict A blockers none on tree 5499fa3226edd6c00e92d00ce099953bc85fdf13 diff sha256 5001e1cc3b8df1d86636d4044d80105bfb4bf87e496d1b4dfea33d42e665a387",
+        "skip_reason": null
+      }
+    }
+  ]
+}

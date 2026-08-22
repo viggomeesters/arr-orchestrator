@@ -32,9 +32,13 @@ class ScenarioContractTests(unittest.TestCase):
             self.service = service
             self.mutations = 0
             self.categories = {"arr-lab": {"savePath": "/data/downloads/arr-lab"}}
-            self.roots = [{"id": 1, "path": "/data/media/tv", "accessible": True}]
+            root = "/data/media/movies" if service == "radarr" else "/data/media/tv"
+            self.roots = [{"id": 1, "path": root, "accessible": True}]
             self.mappings = []
-            self.applications = [{"id": 7, "implementation": "Sonarr", "syncLevel": "addOnly", "fields": []}]
+            self.applications = [
+                {"id": 7, "implementation": "Sonarr", "syncLevel": "addOnly", "fields": []},
+                {"id": 8, "implementation": "Radarr", "syncLevel": "addOnly", "fields": []},
+            ]
 
         def request(self, method, path, *, payload=None, form=None, expected=(200,), headers=None):
             if method == "GET" and path == "/api/v2/torrents/categories":
@@ -73,9 +77,14 @@ class ScenarioContractTests(unittest.TestCase):
             if method == "GET" and path == "/api/v1/applications":
                 return self.applications
             if method == "GET" and path.startswith("/api/v1/applications/"):
-                return self.applications[0]
+                target = int(path.rsplit("/", 1)[1])
+                return next(item for item in self.applications if item["id"] == target)
             if method == "PUT" and path.startswith("/api/v1/applications/"):
-                self.applications = [dict(payload)]
+                target = int(path.rsplit("/", 1)[1])
+                self.applications = [
+                    dict(payload) if item["id"] == target else item
+                    for item in self.applications
+                ]
                 self.mutations += 1
                 return payload
             raise AssertionError((method, path, payload, form, expected, headers))
@@ -160,6 +169,25 @@ class ScenarioContractTests(unittest.TestCase):
             scenarios.apply_runner_config(root, "healthy")
             self.assertFalse(first.exists())
             self.assertTrue(marker.exists())
+
+    def test_unsupported_api_runner_config_binds_the_real_fault_api_route(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "lab-safe"
+            root.mkdir(mode=0o700)
+            (root / lab_script.MARKER).write_text(
+                json.dumps({"compose_project": "arr-orchestrator-lab-safe", "lab_id": "lab-safe"})
+            )
+            state = json.loads(
+                scenarios.apply_runner_config(root, "unsupported-api-version").read_text()
+            )
+            self.assertEqual(
+                {
+                    "service": "prowlarr",
+                    "request_path": "/api/v1/system/status",
+                    "fault_api_scenario": "unsupported-version",
+                },
+                state["fault"],
+            )
 
     def test_runner_config_rejects_unknown_scenario_and_symlink_root(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -255,15 +283,16 @@ class ScenarioContractTests(unittest.TestCase):
                 clients = {
                     "qbittorrent": self.StatefulClient("qbittorrent"),
                     "sonarr": self.StatefulClient("sonarr"),
+                    "radarr": self.StatefulClient("radarr"),
                     "prowlarr": self.StatefulClient("prowlarr"),
                 }
                 first = scenarios.apply_controller_scenario(name, clients)
                 if name == "category-mismatch":
                     self.assertEqual("/data/downloads", first["category_path"])
                 elif name == "root-folder-mismatch":
-                    self.assertEqual(["/data/downloads"], first["root_paths"])
+                    self.assertEqual(["/data/downloads"], first["root_paths"]["sonarr"])
                 elif name == "application-sync-mismatch":
-                    self.assertEqual("disabled", first["application_sync"])
+                    self.assertEqual("disabled", first["application_sync"]["Sonarr"])
                 elif name == "path-mapping-mismatch":
                     self.assertEqual(
                         {
@@ -273,6 +302,8 @@ class ScenarioContractTests(unittest.TestCase):
                         },
                         first["path_mapping"],
                     )
+                self.assertEqual(["/data/media/movies"], first["root_paths"]["radarr"])
+                self.assertEqual("addOnly", first["application_sync"]["Radarr"])
                 mutations = sum(client.mutations for client in clients.values())
                 second = scenarios.apply_controller_scenario(name, clients)
                 self.assertEqual(first, second)
@@ -288,6 +319,7 @@ class ScenarioContractTests(unittest.TestCase):
         clients = {
             "qbittorrent": self.StatefulClient("qbittorrent"),
             "sonarr": self.StatefulClient("sonarr"),
+            "radarr": self.StatefulClient("radarr"),
             "prowlarr": self.StatefulClient("prowlarr"),
         }
         clients["qbittorrent"].categories = {}
@@ -298,6 +330,7 @@ class ScenarioContractTests(unittest.TestCase):
         clients = {
             "qbittorrent": self.StatefulClient("qbittorrent"),
             "sonarr": self.StatefulClient("sonarr"),
+            "radarr": self.StatefulClient("radarr"),
             "prowlarr": self.StatefulClient("prowlarr"),
         }
         clients["sonarr"].roots.append({"id": 9, "path": "/foreign", "accessible": True})
@@ -320,6 +353,7 @@ class ScenarioContractTests(unittest.TestCase):
         clients = {
             "qbittorrent": self.StatefulClient("qbittorrent"),
             "sonarr": self.StatefulClient("sonarr"),
+            "radarr": self.StatefulClient("radarr"),
             "prowlarr": self.StatefulClient("prowlarr"),
         }
         clients["sonarr"].mappings = [unknown_mapping]
@@ -330,6 +364,7 @@ class ScenarioContractTests(unittest.TestCase):
         clients = {
             "qbittorrent": self.StatefulClient("qbittorrent"),
             "sonarr": self.StatefulClient("sonarr"),
+            "radarr": self.StatefulClient("radarr"),
             "prowlarr": self.StatefulClient("prowlarr"),
         }
         clients["prowlarr"].applications.append(
@@ -342,6 +377,7 @@ class ScenarioContractTests(unittest.TestCase):
         clients = {
             "qbittorrent": self.StatefulClient("qbittorrent"),
             "sonarr": self.StatefulClient("sonarr"),
+            "radarr": self.StatefulClient("radarr"),
             "prowlarr": self.StatefulClient("prowlarr"),
         }
         clients["sonarr"].mappings = [unknown_mapping]
